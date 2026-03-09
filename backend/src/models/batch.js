@@ -40,3 +40,4 @@ const batchSchema = new mongoose.Schema(
 );
 
 module.exports = mongoose.model("Batch", batchSchema);
+
