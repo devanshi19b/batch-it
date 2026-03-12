@@ -13,12 +13,12 @@ const {
 
 const { protect } = require("../middleware/auth.middleware");
 
-// Public routes (no login required)
+// Public routes
 router.get("/", getAllBatches);
 router.get("/:batchId", getBatchById);
 router.get("/:batchId/summary", getBatchSummary);
 
-// Protected routes (login required)
+// Protected routes
 router.post("/create", protect, createBatch);
 router.post("/:batchId/items", protect, addItemToBatch);
 router.delete("/:batchId/items/:itemId", protect, removeItemFromBatch);
