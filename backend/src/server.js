@@ -25,7 +25,7 @@ if (process.env.MONGO_URI) {
 // routes
 app.use("/", require("./routes/health.routes"));
 app.use("/api/auth", require("./routes/auth.routes"));
-app.use("/api/batches", require("./routes/batch.routes")); // ✅ fixed
+app.use("/api/batch", require("./routes/batch.routes")); // ✅ fixed
 
 // default route
 app.get("/", (req, res) => {
