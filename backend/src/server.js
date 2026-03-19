@@ -2,6 +2,7 @@ const dotenv = require("dotenv");
 const http = require("http");
 const connectDB = require("./config/db");
 const app = require("./app");
+const { initSocket } = require("./socket/socket");
 
 dotenv.config();
 
@@ -11,6 +12,7 @@ const startServer = async () => {
   await connectDB();
 
   const server = http.createServer(app);
+  initSocket(server);
 
   server.on("error", (err) => {
     if (err.code === "EADDRINUSE") {

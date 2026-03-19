@@ -11,15 +11,33 @@ const {
   isPositiveNumber,
   parseValidDate,
 } = require("../utils/validation");
+const { emitBatchUpdated } = require("../socket/socket");
+
+const serializeUserReference = (user) => {
+  if (!user) {
+    return null;
+  }
+
+  if (typeof user === "object") {
+    return {
+      id: user._id?.toString?.() || user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    };
+  }
+
+  return user.toString?.() || user;
+};
 
 const serializeBatch = (batch) => ({
   ...batch,
   _id: batch._id?.toString?.() || batch._id,
-  initiator: batch.initiator?.toString?.() || batch.initiator,
+  initiator: serializeUserReference(batch.initiator),
   items: (batch.items || []).map((item) => ({
     ...item,
     _id: item._id?.toString?.() || item._id,
-    user: item.user?.toString?.() || item.user,
+    user: serializeUserReference(item.user),
   })),
 });
 
@@ -76,6 +94,8 @@ exports.removeItemFromBatch = async (req, res) => {
       message: "Item removed successfully",
       data: serializeBatch(updatedBatch),
     });
+
+    emitBatchUpdated(updatedBatch, "item_removed");
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -141,6 +161,7 @@ exports.closeBatch = async (req, res) => {
     }
 
     const updatedBatch = await closeBatchRecord(batchId);
+    emitBatchUpdated(updatedBatch, "batch_closed");
 
     return res.status(200).json({
       success: true,
@@ -216,6 +237,7 @@ exports.addItemToBatch = async (req, res) => {
       price: Number(price),
       user: req.user.id,
     });
+    emitBatchUpdated(updatedBatch, "item_added");
 
     return res.status(200).json({
       success: true,
@@ -274,6 +296,7 @@ exports.createBatch = async (req, res) => {
       })),
       expiresAt: parsedExpiresAt.toISOString(),
     });
+    emitBatchUpdated(batch, "batch_created");
 
     return res.status(201).json({
       success: true,

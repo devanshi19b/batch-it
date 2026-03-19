@@ -11,6 +11,39 @@ const {
 
 const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
 
+const sanitizeUserReference = (user) => {
+  if (!user) {
+    return null;
+  }
+
+  const userId = user._id?.toString?.() || user.id || user;
+
+  return {
+    id: userId,
+    name: user.name || "Unknown user",
+    email: user.email || "",
+    role: user.role || "student",
+  };
+};
+
+const enrichUserReference = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === "object" && (value._id || value.id)) {
+    return sanitizeUserReference(value);
+  }
+
+  const match = store.users.find((entry) => {
+    const entryId = entry._id?.toString?.() || entry.id;
+    const lookupId = value._id?.toString?.() || value.id || value;
+    return entryId === lookupId;
+  });
+
+  return sanitizeUserReference(match || value);
+};
+
 const normalizeBatch = (batch) => {
   if (!batch) {
     return null;
@@ -23,13 +56,33 @@ const normalizeBatch = (batch) => {
   return toPlainObject(batch);
 };
 
-const getAllBatchRecords = async () => {
-  if (isDatabaseReady()) {
-    const batches = await Batch.find().sort({ createdAt: -1 });
-    return batches.map(normalizeBatch);
+const enrichBatchUsers = (batch) => {
+  if (!batch) {
+    return null;
   }
 
-  return sortByCreatedAtDesc(store.batches).map(toPlainObject);
+  return {
+    ...batch,
+    initiator: enrichUserReference(batch.initiator),
+    items: (batch.items || []).map((item) => ({
+      ...item,
+      user: enrichUserReference(item.user),
+    })),
+  };
+};
+
+const populateBatchQuery = (query) =>
+  query.populate("initiator", "name email role").populate("items.user", "name email role");
+
+const getAllBatchRecords = async () => {
+  if (isDatabaseReady()) {
+    const batches = await populateBatchQuery(Batch.find().sort({ createdAt: -1 }));
+    return batches.map((batch) => enrichBatchUsers(normalizeBatch(batch)));
+  }
+
+  return sortByCreatedAtDesc(store.batches).map((batch) =>
+    enrichBatchUsers(toPlainObject(batch))
+  );
 };
 
 const findBatchById = async (batchId) => {
@@ -38,12 +91,12 @@ const findBatchById = async (batchId) => {
   }
 
   if (isDatabaseReady()) {
-    const batch = await Batch.findById(batchId);
-    return normalizeBatch(batch);
+    const batch = await populateBatchQuery(Batch.findById(batchId));
+    return enrichBatchUsers(normalizeBatch(batch));
   }
 
   const batch = store.batches.find((entry) => entry._id === batchId);
-  return batch ? toPlainObject(batch) : null;
+  return batch ? enrichBatchUsers(toPlainObject(batch)) : null;
 };
 
 const createBatchRecord = async ({ initiator, buildingId, restaurantName, items, expiresAt }) => {
@@ -56,7 +109,7 @@ const createBatchRecord = async ({ initiator, buildingId, restaurantName, items,
       expiresAt,
     });
 
-    return normalizeBatch(batch);
+    return findBatchById(batch._id.toString());
   }
 
   const now = timestamp();
@@ -80,7 +133,7 @@ const createBatchRecord = async ({ initiator, buildingId, restaurantName, items,
 
   store.batches.push(batch);
 
-  return toPlainObject(batch);
+  return enrichBatchUsers(toPlainObject(batch));
 };
 
 const addItemToBatchRecord = async (batchId, item) => {
@@ -97,7 +150,7 @@ const addItemToBatchRecord = async (batchId, item) => {
 
     batch.items.push(item);
     await batch.save();
-    return normalizeBatch(batch);
+    return findBatchById(batchId);
   }
 
   const batch = store.batches.find((entry) => entry._id === batchId);
@@ -115,7 +168,7 @@ const addItemToBatchRecord = async (batchId, item) => {
   });
   batch.updatedAt = timestamp();
 
-  return toPlainObject(batch);
+  return enrichBatchUsers(toPlainObject(batch));
 };
 
 const removeItemFromBatchRecord = async (batchId, itemId) => {
@@ -134,7 +187,7 @@ const removeItemFromBatchRecord = async (batchId, itemId) => {
       (item) => item._id.toString() !== itemId
     );
     await batch.save();
-    return normalizeBatch(batch);
+    return findBatchById(batchId);
   }
 
   const batch = store.batches.find((entry) => entry._id === batchId);
@@ -146,7 +199,7 @@ const removeItemFromBatchRecord = async (batchId, itemId) => {
   batch.items = batch.items.filter((item) => item._id !== itemId);
   batch.updatedAt = timestamp();
 
-  return toPlainObject(batch);
+  return enrichBatchUsers(toPlainObject(batch));
 };
 
 const closeBatchRecord = async (batchId) => {
@@ -163,7 +216,7 @@ const closeBatchRecord = async (batchId) => {
 
     batch.status = "CLOSED";
     await batch.save();
-    return normalizeBatch(batch);
+    return findBatchById(batchId);
   }
 
   const batch = store.batches.find((entry) => entry._id === batchId);
@@ -175,7 +228,7 @@ const closeBatchRecord = async (batchId) => {
   batch.status = "CLOSED";
   batch.updatedAt = timestamp();
 
-  return toPlainObject(batch);
+  return enrichBatchUsers(toPlainObject(batch));
 };
 
 module.exports = {
