@@ -1,102 +1,129 @@
-const mongoose = require("mongoose");
-const Batch = require("../models/batch");
+const {
+  addItemToBatchRecord,
+  closeBatchRecord,
+  createBatchRecord,
+  findBatchById,
+  getAllBatchRecords,
+  removeItemFromBatchRecord,
+} = require("../repositories/batch.repository");
+const {
+  isNonEmptyString,
+  isPositiveNumber,
+  parseValidDate,
+} = require("../utils/validation");
 
-// REMOVE ITEM FROM BATCH
+const serializeBatch = (batch) => ({
+  ...batch,
+  _id: batch._id?.toString?.() || batch._id,
+  initiator: batch.initiator?.toString?.() || batch.initiator,
+  items: (batch.items || []).map((item) => ({
+    ...item,
+    _id: item._id?.toString?.() || item._id,
+    user: item.user?.toString?.() || item.user,
+  })),
+});
+
+const validateItemPayload = ({ name, quantity, price }) => {
+  if (!isNonEmptyString(name)) {
+    return "Item name is required";
+  }
+
+  if (!isPositiveNumber(quantity)) {
+    return "Item quantity must be a positive number";
+  }
+
+  if (!isPositiveNumber(price)) {
+    return "Item price must be a positive number";
+  }
+
+  return null;
+};
+
 exports.removeItemFromBatch = async (req, res) => {
   try {
     const { batchId, itemId } = req.params;
-
-    const batch = await Batch.findById(batchId);
+    const batch = await findBatchById(batchId);
 
     if (!batch) {
       return res.status(404).json({
         success: false,
-        message: "Batch not found"
+        message: "Batch not found",
       });
     }
 
-    // check if batch is closed
     if (batch.status === "CLOSED") {
       return res.status(400).json({
         success: false,
-        message: "Cannot remove items from a CLOSED batch"
+        message: "Cannot remove items from a CLOSED batch",
       });
     }
 
-    // find item index
-    const itemIndex = batch.items.findIndex(
-      (item) => item._id.toString() === itemId
+    const itemExists = batch.items.some(
+      (item) => (item._id?.toString?.() || item._id) === itemId
     );
 
-    if (itemIndex === -1) {
+    if (!itemExists) {
       return res.status(404).json({
         success: false,
-        message: "Item not found"
+        message: "Item not found",
       });
     }
 
-    // remove item
-    batch.items.splice(itemIndex, 1);
-
-    await batch.save();
+    const updatedBatch = await removeItemFromBatchRecord(batchId, itemId);
 
     res.status(200).json({
       success: true,
       message: "Item removed successfully",
-      data: batch
+      data: serializeBatch(updatedBatch),
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
 
-// GET BATCH SUMMARY
 exports.getBatchSummary = async (req, res) => {
   try {
     const { batchId } = req.params;
-
-    const batch = await Batch.findById(batchId);
+    const batch = await findBatchById(batchId);
 
     if (!batch) {
       return res.status(404).json({
         success: false,
-        message: "Batch not found"
+        message: "Batch not found",
       });
     }
 
     let totalItems = 0;
     let totalAmount = 0;
 
-    batch.items.forEach((item) => {
-      totalItems += item.quantity;
-      totalAmount += item.quantity * item.price;
+    const items = Array.isArray(batch.items) ? batch.items : [];
+
+    items.forEach((item) => {
+      totalItems += Number(item.quantity) || 0;
+      totalAmount += (Number(item.quantity) || 0) * (Number(item.price) || 0);
     });
 
     res.status(200).json({
       success: true,
-      batchId: batch._id,
+      batchId: batch._id?.toString?.() || batch._id,
       totalItems,
-      totalAmount
+      totalAmount,
     });
-
   } catch (error) {
     res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
 
-// ✅ CLOSE BATCH
 exports.closeBatch = async (req, res) => {
   try {
     const { batchId } = req.params;
-
-    const batch = await Batch.findById(batchId);
+    const batch = await findBatchById(batchId);
 
     if (!batch) {
       return res.status(404).json({
@@ -113,16 +140,13 @@ exports.closeBatch = async (req, res) => {
       });
     }
 
-    // Update status
-    batch.status = "CLOSED";
-    await batch.save();
+    const updatedBatch = await closeBatchRecord(batchId);
 
     return res.status(200).json({
       success: true,
       message: "Batch closed successfully",
-      data: batch,
+      data: serializeBatch(updatedBatch),
     });
-
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -135,45 +159,41 @@ exports.closeBatch = async (req, res) => {
 exports.getBatchById = async (req, res) => {
   try {
     const { batchId } = req.params;
-
-    const batch = await Batch.findById(batchId);
+    const batch = await findBatchById(batchId);
 
     if (!batch) {
       return res.status(404).json({
         success: false,
-        message: "Batch not found"
+        message: "Batch not found",
       });
     }
 
     return res.status(200).json({
       success: true,
-      data: batch
+      data: serializeBatch(batch),
     });
-
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: error.message
+      message: error.message,
     });
   }
 };
 
-// ✅ ADD ITEM TO EXISTING BATCH
 exports.addItemToBatch = async (req, res) => {
   try {
     const { batchId } = req.params;
     const { name, quantity, price } = req.body;
+    const validationMessage = validateItemPayload({ name, quantity, price });
 
-    // Validate required fields
-    if (!name || !quantity || !price) {
+    if (validationMessage) {
       return res.status(400).json({
         success: false,
-        message: "name, quantity and price are required",
+        message: validationMessage,
       });
     }
 
-    // Find batch
-    const batch = await Batch.findById(batchId);
+    const batch = await findBatchById(batchId);
 
     if (!batch) {
       return res.status(404).json({
@@ -190,22 +210,18 @@ exports.addItemToBatch = async (req, res) => {
       });
     }
 
-    // Add item
-    batch.items.push({
-      name,
-      quantity,
-      price,
-      user: req.user.id // temporary user
+    const updatedBatch = await addItemToBatchRecord(batchId, {
+      name: name.trim(),
+      quantity: Number(quantity),
+      price: Number(price),
+      user: req.user.id,
     });
-
-    await batch.save();
 
     return res.status(200).json({
       success: true,
       message: "Item added successfully",
-      data: batch,
+      data: serializeBatch(updatedBatch),
     });
-
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -218,39 +234,51 @@ exports.addItemToBatch = async (req, res) => {
 exports.createBatch = async (req, res) => {
   try {
     const { buildingId, restaurantName, items, expiresAt } = req.body;
+    const parsedExpiresAt = parseValidDate(expiresAt);
 
-    // Required fields check
-    if (!buildingId || !restaurantName || !expiresAt) {
+    if (!isNonEmptyString(buildingId) || !isNonEmptyString(restaurantName) || !expiresAt) {
       return res.status(400).json({
         success: false,
         message: "buildingId, restaurantName and expiresAt are required",
       });
     }
 
-    // Validate Date
-    if (isNaN(new Date(expiresAt))) {
+    if (!parsedExpiresAt) {
       return res.status(400).json({
         success: false,
         message: "Invalid expiresAt date format",
       });
     }
 
-    // Temporary: generate valid ObjectId for initiator (until auth ready)
-    const validUserId = new mongoose.Types.ObjectId();
+    const normalizedItems = Array.isArray(items) ? items : [];
 
-    const batch = await Batch.create({
+    for (const item of normalizedItems) {
+      const validationMessage = validateItemPayload(item || {});
+      if (validationMessage) {
+        return res.status(400).json({
+          success: false,
+          message: validationMessage,
+        });
+      }
+    }
+
+    const batch = await createBatchRecord({
       initiator: req.user.id,
-      buildingId,
-      restaurantName,
-      items,
-      expiresAt,
+      buildingId: buildingId.trim(),
+      restaurantName: restaurantName.trim(),
+      items: normalizedItems.map((item) => ({
+        name: item.name.trim(),
+        quantity: Number(item.quantity),
+        price: Number(item.price),
+        user: req.user.id,
+      })),
+      expiresAt: parsedExpiresAt.toISOString(),
     });
 
     return res.status(201).json({
       success: true,
-      data: batch,
+      data: serializeBatch(batch),
     });
-
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -262,14 +290,13 @@ exports.createBatch = async (req, res) => {
 // ✅ GET ALL BATCHES
 exports.getAllBatches = async (req, res) => {
   try {
-    const batches = await Batch.find().sort({ createdAt: -1 });
+    const batches = await getAllBatchRecords();
 
     return res.status(200).json({
       success: true,
       count: batches.length,
-      data: batches,
+      data: batches.map(serializeBatch),
     });
-
   } catch (error) {
     return res.status(500).json({
       success: false,

@@ -1,9 +1,12 @@
 const express = require("express");
 const router = express.Router();
 
-// Task routes placeholder. Implement actual handlers in `src/controllers/task.controller.js`.
 router.get("/", (req, res) => {
-  res.status(200).json({ message: "Task routes placeholder" });
+  res.status(200).json({
+    success: true,
+    message: "Tasks endpoint is available",
+    data: [],
+  });
 });
 
 module.exports = router;
