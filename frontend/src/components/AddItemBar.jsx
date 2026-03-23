@@ -1,94 +1,77 @@
 export default function AddItemBar({
-  draft,
-  participants,
-  batchStatus,
-  isSubmitting,
+  values,
   onChange,
   onSubmit,
+  isSubmitting,
+  isClosed,
 }) {
-  const isClosed = batchStatus === "closed";
-
   return (
-    <form className="composer-card" onSubmit={onSubmit}>
-      <div className="composer-heading">
-        <div>
-          <p className="eyebrow">Add to session</p>
-          <h2>Drop in a new item for the group</h2>
-        </div>
-        <span className={`panel-badge panel-badge--${batchStatus}`}>
-          {isClosed ? "Ordering locked" : "Updates appear instantly"}
-        </span>
-      </div>
+    <div className="sticky bottom-4 mt-6">
+      <form className="surface overflow-hidden p-4 sm:p-5" onSubmit={onSubmit}>
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-end">
+          <div className="min-w-0 flex-1">
+            <label className="field-label" htmlFor="itemName">
+              Item name
+            </label>
+            <input
+              id="itemName"
+              className="field-input"
+              name="name"
+              placeholder="Smoky paneer wrap"
+              value={values.name}
+              onChange={onChange}
+              disabled={isClosed}
+              required
+            />
+          </div>
 
-      <div className="composer-grid">
-        <label className="field">
-          <span>Item name</span>
-          <input
-            type="text"
-            placeholder="Tandoori paneer slider"
-            value={draft.name}
-            onChange={onChange("name")}
-            disabled={isClosed}
-          />
-        </label>
+          <div className="grid gap-4 sm:grid-cols-2 xl:w-[260px] xl:grid-cols-2">
+            <div>
+              <label className="field-label" htmlFor="itemQuantity">
+                Quantity
+              </label>
+              <input
+                id="itemQuantity"
+                className="field-input"
+                type="number"
+                min="1"
+                step="1"
+                name="quantity"
+                value={values.quantity}
+                onChange={onChange}
+                disabled={isClosed}
+                required
+              />
+            </div>
 
-        <label className="field field--compact">
-          <span>Qty</span>
-          <input
-            type="number"
-            min="1"
-            value={draft.quantity}
-            onChange={onChange("quantity")}
-            disabled={isClosed}
-          />
-        </label>
+            <div>
+              <label className="field-label" htmlFor="itemPrice">
+                Price
+              </label>
+              <input
+                id="itemPrice"
+                className="field-input"
+                type="number"
+                min="1"
+                step="0.01"
+                name="price"
+                value={values.price}
+                onChange={onChange}
+                disabled={isClosed}
+                required
+              />
+            </div>
+          </div>
 
-        <label className="field field--compact">
-          <span>Price</span>
-          <input
-            type="number"
-            min="1"
-            placeholder="320"
-            value={draft.price}
-            onChange={onChange("price")}
-            disabled={isClosed}
-          />
-        </label>
-
-        <label className="field">
-          <span>Who is adding it?</span>
-          <select
-            value={draft.participantId}
-            onChange={onChange("participantId")}
-            disabled={isClosed}
+          <button
+            type="submit"
+            className="btn-primary xl:min-w-[190px]"
+            disabled={isClosed || isSubmitting}
           >
-            {participants.map((participant) => (
-              <option key={participant.id} value={participant.id}>
-                {participant.name} • {participant.role}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="field field--wide">
-          <span>Context for the group</span>
-          <input
-            type="text"
-            placeholder="For the table, less spicy, split three ways..."
-            value={draft.note}
-            onChange={onChange("note")}
-            disabled={isClosed}
-          />
-        </label>
-
-        <button
-          type="submit"
-          className="primary-button composer-button"
-          disabled={isClosed || isSubmitting}
-        >
-          {isClosed ? "Batch closed" : isSubmitting ? "Saving..." : "Add To Shared Cart"}
-        </button>
-      </div>
-    </form>
+            {isClosed ? "Batch Closed" : isSubmitting ? "Adding..." : "Add Item"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }

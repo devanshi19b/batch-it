@@ -1,149 +1,163 @@
-import { useContext, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import API from "../services/api";
-import { AuthContext } from "../context/AuthContext";
+import { useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import api, { getErrorMessage } from "../services/api";
 
-const SAMPLE_PARTICIPANTS = ["Rohit", "Meera", "Arjun", "You"];
+const PRODUCT_POINTS = [
+  "Live activity feed for every item added",
+  "Shared total and per-person split in one view",
+  "Fast batch creation for offices, hostels, and teams",
+];
 
 export default function Login() {
   const navigate = useNavigate();
-  const { login } = useContext(AuthContext);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const location = useLocation();
+  const { login } = useAuth();
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [error, setError] = useState(
+    new URLSearchParams(location.search).get("reason") === "session-expired"
+      ? "Your session expired. Please log in again."
+      : ""
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
 
-  const participantPreview = useMemo(
-    () =>
-      SAMPLE_PARTICIPANTS.map((name) =>
-        name
-          .split(" ")
-          .map((word) => word[0])
-          .join("")
-          .slice(0, 2)
-          .toUpperCase()
-      ),
+  const from = location.state?.from || "/dashboard";
+
+  const visualDots = useMemo(
+    () => [
+      { className: "left-12 top-14 h-24 w-24 bg-emerald-300/20" },
+      { className: "right-10 top-32 h-32 w-32 bg-cyan-300/20" },
+      { className: "bottom-12 left-1/3 h-28 w-28 bg-amber-300/20" },
+    ],
     []
   );
 
-  const handleLogin = async (event) => {
+  const handleChange = (event) => {
+    const { name, value } = event.target;
+    setForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleSubmit = async (event) => {
     event.preventDefault();
-    setErrorMessage("");
+    setError("");
     setIsSubmitting(true);
 
     try {
-      const res = await API.post("/auth/login", { email, password });
-      login(res.data.token, res.data.user);
-      navigate("/dashboard");
-    } catch (error) {
-      setErrorMessage(
-        "Unable to reach the backend right now. You can still open the demo workspace."
-      );
+      const response = await api.post("/auth/login", form);
+      login(response.data.token, response.data.user);
+      navigate(from, { replace: true });
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, "Unable to sign in right now."));
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleDemoEntry = () => {
-    login("demo-token", {
-      id: "demo-user",
-      name: "Demo User",
-      email: "demo@batchit.app",
-      role: "student",
-    });
-    navigate("/dashboard");
-  };
-
   return (
-    <div className="auth-page">
-      <section className="auth-shell">
-        <div className="auth-hero">
-          <span className="live-pill">Realtime ordering</span>
-          <p className="eyebrow">Shared session product</p>
-          <h1>Coordinate one order without turning chat into chaos.</h1>
-          <p className="auth-lead">
-            Create a batch, invite the group, watch items land live, and close the
-            order with confidence before the timer runs out.
-          </p>
+    <main className="relative min-h-screen overflow-hidden">
+      {visualDots.map((dot) => (
+        <div
+          key={dot.className}
+          className={`pointer-events-none absolute rounded-full blur-3xl ${dot.className}`}
+          aria-hidden="true"
+        />
+      ))}
 
-          <div className="auth-feature-grid">
-            <article className="auth-feature">
-              <strong>Live activity feed</strong>
-              <span>See who joined, what was added, and when decisions changed.</span>
-            </article>
-            <article className="auth-feature">
-              <strong>Shared cart clarity</strong>
-              <span>Every item stays tagged to a person so the split stays obvious.</span>
-            </article>
-            <article className="auth-feature">
-              <strong>Urgency without clutter</strong>
-              <span>Timers and close controls keep the batch moving cleanly.</span>
-            </article>
-          </div>
+      <div className="app-shell flex min-h-screen items-center py-10">
+        <div className="grid w-full gap-8 xl:grid-cols-[1.08fr_0.92fr]">
+          <section className="surface relative overflow-hidden p-8 sm:p-10">
+            <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-emerald-300/10 blur-3xl" />
+            <div className="relative max-w-2xl space-y-8">
+              <span className="pill border-emerald-300/30 text-emerald-100">
+                Collaborative ordering platform
+              </span>
+              <div className="space-y-5">
+                <p className="eyebrow">Batch-It frontend</p>
+                <h1 className="max-w-2xl text-4xl font-bold leading-tight text-white sm:text-6xl">
+                  Turn one food order into a live shared workspace.
+                </h1>
+                <p className="max-w-xl text-base leading-8 text-slate-300">
+                  Batch-It feels closer to a team dashboard than a food app: everyone adds
+                  items, totals update in real time, and the host closes the room when the
+                  group is ready.
+                </p>
+              </div>
 
-          <div className="auth-presence">
-            <div className="presence-stack" aria-hidden="true">
-              {participantPreview.map((initials, index) => (
-                <span
-                  key={initials}
-                  className="presence-avatar"
-                  style={{
-                    "--avatar-accent": ["#FF8A3D", "#5D8BFF", "#21B87C", "#F25F7A"][
-                      index
-                    ],
-                  }}
-                >
-                  {initials}
-                </span>
-              ))}
+              <div className="grid gap-4 sm:grid-cols-3">
+                {PRODUCT_POINTS.map((point, index) => (
+                  <article
+                    key={point}
+                    className="surface-soft animate-rise p-5"
+                    style={{ animationDelay: `${index * 90}ms` }}
+                  >
+                    <span className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
+                      0{index + 1}
+                    </span>
+                    <p className="mt-3 text-sm leading-7 text-slate-200">{point}</p>
+                  </article>
+                ))}
+              </div>
             </div>
-            <p>Built for teams, hostels, offices, and any group that orders together.</p>
-          </div>
+          </section>
+
+          <section className="surface flex items-center p-8 sm:p-10">
+            <div className="w-full">
+              <div className="mb-8">
+                <p className="eyebrow">Sign in</p>
+                <h2 className="mt-2 text-3xl font-semibold text-white">Enter your workspace</h2>
+                <p className="mt-3 text-sm leading-7 text-slate-400">
+                  Use your existing backend credentials. The frontend stores the JWT locally
+                  and protects every dashboard route.
+                </p>
+              </div>
+
+              <form className="space-y-5" onSubmit={handleSubmit}>
+                <div>
+                  <label className="field-label" htmlFor="email">
+                    Email
+                  </label>
+                  <input
+                    id="email"
+                    className="field-input"
+                    type="email"
+                    name="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    placeholder="you@batchit.app"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="field-label" htmlFor="password">
+                    Password
+                  </label>
+                  <input
+                    id="password"
+                    className="field-input"
+                    type="password"
+                    name="password"
+                    value={form.password}
+                    onChange={handleChange}
+                    placeholder="Enter your password"
+                    required
+                  />
+                </div>
+
+                {error ? (
+                  <div className="status-banner border-rose-400/20 bg-rose-400/10 text-rose-100">
+                    {error}
+                  </div>
+                ) : null}
+
+                <button type="submit" className="btn-primary w-full" disabled={isSubmitting}>
+                  {isSubmitting ? "Signing In..." : "Log In"}
+                </button>
+              </form>
+            </div>
+          </section>
         </div>
-
-        <form className="auth-card" onSubmit={handleLogin}>
-          <div className="auth-card-copy">
-            <p className="eyebrow">Welcome back</p>
-            <h2>Enter your workspace</h2>
-            <span>Sign in to create or join a live ordering batch.</span>
-          </div>
-
-          <label className="field">
-            <span>Email</span>
-            <input
-              type="email"
-              placeholder="team@batchit.app"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-            />
-          </label>
-
-          <label className="field">
-            <span>Password</span>
-            <input
-              type="password"
-              placeholder="Enter password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-            />
-          </label>
-
-          {errorMessage ? <p className="form-message">{errorMessage}</p> : null}
-
-          <div className="auth-actions">
-            <button type="submit" className="primary-button" disabled={isSubmitting}>
-              {isSubmitting ? "Signing in..." : "Sign In"}
-            </button>
-            <button
-              type="button"
-              className="ghost-button"
-              onClick={handleDemoEntry}
-            >
-              Open Demo Workspace
-            </button>
-          </div>
-        </form>
-      </section>
-    </div>
+      </div>
+    </main>
   );
 }

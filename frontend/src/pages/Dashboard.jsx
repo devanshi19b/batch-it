@@ -1,276 +1,277 @@
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import API from "../services/api";
+import { useNavigate } from "react-router-dom";
+import BatchCard from "../components/BatchCard";
+import CreateBatchModal from "../components/CreateBatchModal";
+import { useAuth } from "../context/AuthContext";
+import api, { getErrorMessage } from "../services/api";
 import { getSocket } from "../services/socket";
+import { mapBatchCard } from "../utils/batch";
+import { formatCurrency, toLocalDateTimeValue } from "../utils/formatters";
 
-const FALLBACK_BATCHES = [
-  {
-    _id: "4821",
-    restaurantName: "Theory Cafe",
-    title: "Friday Sprint Feast",
-    members: 4,
-    items: 5,
-    total: 1055,
-    timeLeft: "18:24",
-    mood: "Ordering now",
-  },
-  {
-    _id: "1942",
-    restaurantName: "Late Night Republic",
-    title: "Studio Fuel Run",
-    members: 6,
-    items: 9,
-    total: 1840,
-    timeLeft: "07:52",
-    mood: "Almost closing",
-  },
-  {
-    _id: "6508",
-    restaurantName: "House of Dimsums",
-    title: "Design Review Lunch",
-    members: 3,
-    items: 4,
-    total: 920,
-    timeLeft: "22:10",
-    mood: "Fresh batch",
-  },
-];
-
-function formatCurrency(value) {
-  return new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    maximumFractionDigits: 0,
-  }).format(value);
-}
-
-function formatCountdown(expiresAt) {
-  if (!expiresAt) {
-    return "No timer";
-  }
-
-  const diff = new Date(expiresAt).getTime() - Date.now();
-
-  if (diff <= 0) {
-    return "00:00";
-  }
-
-  const totalSeconds = Math.floor(diff / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-}
-
-function mapBatchToCard(batch) {
-  const items = Array.isArray(batch.items) ? batch.items : [];
-  const total = items.reduce(
-    (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.price) || 0),
-    0
-  );
-  const itemCount = items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
-  const participantIds = new Set();
-
-  if (batch.initiator?.id || batch.initiator) {
-    participantIds.add(batch.initiator?.id || batch.initiator);
-  }
-
-  items.forEach((item) => {
-    const userId = item.user?.id || item.user;
-    if (userId) {
-      participantIds.add(userId);
-    }
-  });
-
-  const countdown = formatCountdown(batch.expiresAt);
-  const isClosed = batch.status === "CLOSED";
-  const mood = isClosed
-    ? "Closed"
-    : countdown === "00:00"
-      ? "Closing now"
-      : participantIds.size > 3
-        ? "Group ordering live"
-        : "Open session";
-
+function createEmptyForm() {
   return {
-    _id: batch._id,
-    restaurantName: batch.restaurantName,
-    title: batch.buildingId ? `${batch.restaurantName} • ${batch.buildingId}` : `${batch.restaurantName} Session`,
-    members: participantIds.size,
-    items: itemCount,
-    total,
-    timeLeft: isClosed ? "Closed" : countdown,
-    mood,
-    status: batch.status,
+    restaurantName: "",
+    buildingId: "",
+    expiresAt: toLocalDateTimeValue(),
   };
 }
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const [batches, setBatches] = useState([]);
+  const [now, setNow] = useState(Date.now());
   const [loading, setLoading] = useState(true);
-  const [usingFallback, setUsingFallback] = useState(false);
+  const [error, setError] = useState("");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+  const [createForm, setCreateForm] = useState(() => createEmptyForm());
 
   useEffect(() => {
-    let isMounted = true;
+    let active = true;
 
-    API.get("/batch")
-      .then((res) => {
-        if (!isMounted) {
-          return;
-        }
+    async function loadBatches() {
+      setLoading(true);
+      setError("");
 
-        const data = Array.isArray(res.data?.data) ? res.data.data : [];
-        const mappedBatches = data.map(mapBatchToCard);
-        setBatches(mappedBatches);
-        setUsingFallback(mappedBatches.length === 0);
-        if (mappedBatches.length === 0) {
-          setBatches(FALLBACK_BATCHES);
-        }
-      })
-      .catch(() => {
-        if (!isMounted) {
-          return;
-        }
+      try {
+        const response = await api.get("/batch");
+        const nextBatches = Array.isArray(response.data?.data) ? response.data.data : [];
 
-        setUsingFallback(true);
-        setBatches(FALLBACK_BATCHES);
-      })
-      .finally(() => {
-        if (isMounted) {
+        if (active) {
+          setBatches(nextBatches);
+        }
+      } catch (requestError) {
+        if (active) {
+          setError(getErrorMessage(requestError, "Unable to load batches right now."));
+        }
+      } finally {
+        if (active) {
           setLoading(false);
         }
-      });
+      }
+    }
+
+    loadBatches();
 
     return () => {
-      isMounted = false;
+      active = false;
     };
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     const socket = getSocket();
+
     const handleBatchesChanged = (payload) => {
       if (!payload?.batch) {
         return;
       }
 
-      const mappedBatch = mapBatchToCard(payload.batch);
-      setUsingFallback(false);
-      setBatches((current) => {
-        const next = [mappedBatch, ...current.filter((batch) => batch._id !== mappedBatch._id)];
-        return next;
-      });
+      setBatches((current) => [
+        payload.batch,
+        ...current.filter((batch) => batch._id !== payload.batch._id),
+      ]);
     };
 
     socket.on("batches:changed", handleBatchesChanged);
 
+    if (!socket.connected) {
+      socket.connect();
+    }
+
     return () => {
       socket.off("batches:changed", handleBatchesChanged);
     };
+  }, [user?.id]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(intervalId);
   }, []);
 
-  const summary = useMemo(() => {
-    return batches.reduce(
+  const cards = useMemo(
+    () => batches.map((batch) => mapBatchCard(batch, user?.id)),
+    [batches, now, user?.id]
+  );
+
+  const totals = useMemo(() => {
+    return cards.reduce(
       (accumulator, batch) => {
-        accumulator.totalMembers += batch.members ?? 0;
-        accumulator.totalItems += batch.items ?? 0;
-        accumulator.totalSpend += batch.total ?? 0;
+        if (batch.status === "LIVE") {
+          accumulator.totalBatches += 1;
+        }
+        accumulator.totalPeople += batch.participantCount || 0;
+        accumulator.totalItems += batch.itemCount || 0;
+        accumulator.totalValue += batch.total || 0;
         return accumulator;
       },
-      { totalMembers: 0, totalItems: 0, totalSpend: 0 }
+      {
+        totalBatches: 0,
+        totalPeople: 0,
+        totalItems: 0,
+        totalValue: 0,
+      }
     );
-  }, [batches]);
+  }, [cards]);
+
+  const handleCreateFormChange = (event) => {
+    const { name, value } = event.target;
+    setCreateForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleCreateBatch = async (event) => {
+    event.preventDefault();
+    setError("");
+    setIsCreating(true);
+
+    try {
+      const response = await api.post("/batch/create", {
+        restaurantName: createForm.restaurantName.trim(),
+        buildingId: createForm.buildingId.trim(),
+        expiresAt: new Date(createForm.expiresAt).toISOString(),
+      });
+
+      const nextBatch = response.data?.data;
+
+      setCreateForm(createEmptyForm());
+      setIsCreateOpen(false);
+
+      if (nextBatch?._id) {
+        navigate(`/batch/${nextBatch._id}`);
+      }
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, "Unable to create a batch."));
+    } finally {
+      setIsCreating(false);
+    }
+  };
 
   return (
-    <div className="dashboard-page">
-      <section className="dashboard-shell">
-        <header className="dashboard-hero">
-          <div>
-            <span className="live-pill">Batch control room</span>
-            <p className="eyebrow">Shared ordering overview</p>
-            <h1>See every live group order in one place.</h1>
-            <p className="dashboard-lead">
-              Open active sessions, watch totals rise, and jump directly into the
-              collaboration flow when a batch needs attention.
+    <main className="app-shell">
+      <CreateBatchModal
+        isOpen={isCreateOpen}
+        values={createForm}
+        onChange={handleCreateFormChange}
+        onClose={() => {
+          setIsCreateOpen(false);
+          setCreateForm(createEmptyForm());
+        }}
+        onSubmit={handleCreateBatch}
+        isSubmitting={isCreating}
+      />
+
+      <section className="surface overflow-hidden p-6 sm:p-8">
+        <div className="flex flex-col gap-8 xl:flex-row xl:items-start xl:justify-between">
+          <div className="max-w-3xl">
+            <span className="pill border-cyan-300/30 text-cyan-100">Realtime batch control room</span>
+            <p className="eyebrow mt-6">Dashboard</p>
+            <h1 className="mt-2 text-4xl font-bold tracking-tight text-white sm:text-5xl">
+              See every collaborative order from one place.
+            </h1>
+            <p className="mt-4 max-w-2xl text-sm leading-8 text-slate-300 sm:text-base">
+              Open a batch, watch totals move, and jump into the order room the moment a team
+              needs attention.
             </p>
           </div>
 
-          <div className="dashboard-actions">
-            <button type="button" className="ghost-button">
-              Join Existing Batch
-            </button>
-            <button type="button" className="primary-button">
-              Create Batch
-            </button>
-          </div>
-        </header>
-
-        <section className="dashboard-summary-grid">
-          <article className="metric-card">
-            <span>Open batches</span>
-            <strong>{batches.length}</strong>
-          </article>
-          <article className="metric-card">
-            <span>People collaborating</span>
-            <strong>{summary.totalMembers}</strong>
-          </article>
-          <article className="metric-card metric-card--accent">
-            <span>Tracked order value</span>
-            <strong>{formatCurrency(summary.totalSpend)}</strong>
-          </article>
-          <article className="metric-card">
-            <span>Items across sessions</span>
-            <strong>{summary.totalItems}</strong>
-          </article>
-        </section>
-
-        <section className="dashboard-list-panel panel">
-          <div className="panel-header">
-            <div>
-              <p className="eyebrow">Live sessions</p>
-              <h2>Active batches</h2>
+          <div className="flex w-full max-w-sm flex-col gap-4">
+            <div className="surface-soft flex items-center justify-between gap-3 p-4">
+              <div>
+                <p className="text-sm text-slate-400">Signed in as</p>
+                <strong className="mt-1 block text-lg text-white">
+                  {user?.name || user?.email || "Authenticated user"}
+                </strong>
+              </div>
+              <button type="button" className="btn-secondary" onClick={logout}>
+                Log out
+              </button>
             </div>
-            <span className={`panel-badge ${usingFallback ? "panel-badge--live" : ""}`}>
-              {loading ? "Loading..." : usingFallback ? "Demo data" : "Backend synced"}
-            </span>
+
+            <button type="button" className="btn-primary" onClick={() => setIsCreateOpen(true)}>
+              Create New Batch
+            </button>
           </div>
+        </div>
 
-          <div className="dashboard-batch-list">
-              {batches.map((batch, index) => (
-                <Link
-                  key={batch._id}
-                  className="dashboard-batch-card"
-                  to={`/batch/${batch._id}`}
-                  style={{ animationDelay: `${index * 70}ms` }}
-              >
-                <div className="dashboard-batch-head">
-                  <div>
-                    <p className="item-category">{batch.restaurantName}</p>
-                    <h3>{batch.title ?? `${batch.restaurantName} Session`}</h3>
-                  </div>
-                  <span
-                    className={`panel-badge ${
-                      batch.status === "CLOSED" ? "panel-badge--closed" : "panel-badge--live"
-                    }`}
-                  >
-                    {batch.timeLeft ?? "Live"}
-                  </span>
-                </div>
+        <div className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <article className="metric-tile">
+            <p className="text-sm text-slate-400">Open rooms</p>
+            <strong className="mt-2 block text-3xl font-semibold text-white">
+              {totals.totalBatches}
+            </strong>
+          </article>
+          <article className="metric-tile">
+            <p className="text-sm text-slate-400">Participants tracked</p>
+            <strong className="mt-2 block text-3xl font-semibold text-white">
+              {totals.totalPeople}
+            </strong>
+          </article>
+          <article className="metric-tile">
+            <p className="text-sm text-slate-400">Items across rooms</p>
+            <strong className="mt-2 block text-3xl font-semibold text-white">
+              {totals.totalItems}
+            </strong>
+          </article>
+          <article className="metric-tile bg-white/[0.08]">
+            <p className="text-sm text-slate-400">Tracked value</p>
+            <strong className="mt-2 block text-3xl font-semibold text-white">
+              {formatCurrency(totals.totalValue)}
+            </strong>
+          </article>
+        </div>
+      </section>
 
-                <div className="dashboard-batch-meta">
-                  <span>{batch.members ?? 0} members</span>
-                  <span>{batch.items ?? 0} items</span>
-                  <span>{formatCurrency(batch.total ?? 0)}</span>
-                </div>
+      {error ? (
+        <div className="status-banner mt-6 border-rose-400/20 bg-rose-400/10 text-rose-100">
+          {error}
+        </div>
+      ) : null}
 
-                <div className="dashboard-batch-footer">
-                  <strong>{batch.mood ?? "Active now"}</strong>
-                  <span>Open workspace</span>
-                </div>
-              </Link>
+      <section className="mt-6">
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div>
+            <p className="eyebrow">Live sessions</p>
+            <h2 className="mt-2 text-2xl font-semibold text-white">All batches</h2>
+          </div>
+          <span className="pill">{loading ? "Syncing..." : "Backend connected"}</span>
+        </div>
+
+        {loading ? (
+          <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="surface h-72 animate-pulse bg-white/[0.04]" />
             ))}
           </div>
-        </section>
+        ) : cards.length ? (
+          <div className="grid gap-5 lg:grid-cols-2 xl:grid-cols-3">
+            {cards.map((batch, index) => (
+              <BatchCard key={batch.id} batch={batch} index={index} />
+            ))}
+          </div>
+        ) : (
+          <div className="surface grid min-h-[360px] place-items-center p-8 text-center">
+            <div className="max-w-md">
+              <p className="eyebrow">No batches yet</p>
+              <h3 className="mt-3 text-3xl font-semibold text-white">
+                Start the first shared order room.
+              </h3>
+              <p className="mt-3 text-sm leading-7 text-slate-400">
+                Create a batch from the dashboard and invite others to begin adding items live.
+              </p>
+              <button
+                type="button"
+                className="btn-primary mt-6"
+                onClick={() => setIsCreateOpen(true)}
+              >
+                Launch a Batch
+              </button>
+            </div>
+          </div>
+        )}
       </section>
-    </div>
+    </main>
   );
 }

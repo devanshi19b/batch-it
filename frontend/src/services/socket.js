@@ -1,15 +1,15 @@
 import { io } from "socket.io-client";
 import { BACKEND_URL } from "./api";
 
-let socketInstance = null;
+let socket;
 
 export function getSocket() {
-  if (!socketInstance) {
-    socketInstance = io(BACKEND_URL, {
-      autoConnect: true,
+  if (!socket) {
+    socket = io(BACKEND_URL, {
+      autoConnect: false,
       transports: ["websocket", "polling"],
     });
   }
 
-  return socketInstance;
+  return socket;
 }
