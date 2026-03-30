@@ -1,52 +1,40 @@
 const dotenv = require("dotenv");
-const http = require("http");
-const connectDB = require("./config/db");
-const app = require("./app");
-const { initSocket } = require("./socket/socket");
 
 dotenv.config();
 
-const PORT = Number(process.env.PORT) || 5050;
-const HOST = process.env.HOST || "127.0.0.1";
+const http = require("http");
+const app = require("./app");
+const { connectDB } = require("./config/db");
+const { HOST, PORT } = require("./config/env");
+const { initSocket } = require("./socket/socket");
 
-const logListenError = (err) => {
-  if (err.code === "EADDRINUSE") {
-    console.error(
-      `Port ${PORT} is already in use on ${HOST}.\nPlease stop the other process or set a different PORT value.`
-    );
-    return;
-  }
-
-  if (err.code === "EPERM") {
-    console.error(
-      `The server could not bind to ${HOST}:${PORT}.\nTry using a different HOST/PORT value, or run the server in an environment that allows local port binding.`
-    );
-    return;
-  }
-
-  console.error("Server error:", err);
-};
-
-const startServer = async () => {
+const startServer = async ({ host = HOST, port = PORT } = {}) => {
   await connectDB();
 
   const server = http.createServer(app);
   initSocket(server);
 
-  server.on("error", (err) => {
-    logListenError(err);
-    process.exit(1);
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, host, resolve);
   });
 
-  server.listen(PORT, HOST, () => {
-    console.log(`Server running on http://${HOST}:${PORT}`);
-  });
+  const address = server.address();
+  const printablePort =
+    typeof address === "object" && address ? address.port : port;
+
+  console.log(`Server running on http://${host}:${printablePort}`);
 
   return server;
 };
 
 if (require.main === module) {
-  startServer();
+  startServer().catch((error) => {
+    console.error("Failed to start server:", error.message);
+    process.exit(1);
+  });
 }
 
-module.exports = { startServer };
+module.exports = {
+  startServer,
+};

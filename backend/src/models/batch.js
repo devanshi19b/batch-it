@@ -1,4 +1,5 @@
 const mongoose = require("mongoose");
+const itemSchema = require("./Item");
 
 const batchSchema = new mongoose.Schema(
   {
@@ -10,22 +11,13 @@ const batchSchema = new mongoose.Schema(
     buildingId: {
       type: String,
       required: true,
+      trim: true,
     },
     restaurantName: {
       type: String,
       required: true,
+      trim: true,
     },
-    items: [
-      {
-        name: String,
-        quantity: Number,
-        price: Number,
-        user: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "User",
-        },
-      },
-    ],
     status: {
       type: String,
       enum: ["LIVE", "CLOSED"],
@@ -35,9 +27,9 @@ const batchSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    items: [itemSchema],
   },
   { timestamps: true }
 );
 
-module.exports = mongoose.model("Batch", batchSchema);
-
+module.exports = mongoose.models.Batch || mongoose.model("Batch", batchSchema);

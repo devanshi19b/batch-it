@@ -1,9 +1,8 @@
 const express = require("express");
-const healthRoutes = require("./routes/health.routes");
 const authRoutes = require("./routes/auth.routes");
 const batchRoutes = require("./routes/batch.routes");
-const taskRoutes = require("./routes/task.routes");
-const { notFound, errorHandler } = require("./middleware/error.middleware");
+const healthRoutes = require("./routes/health.routes");
+const { errorHandler, notFound } = require("./middleware/error.middleware");
 
 const app = express();
 
@@ -24,18 +23,17 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
+app.get("/", (_req, res) => {
+  return res.status(200).json({
+    success: true,
+    message: "Batch-It API is running.",
+  });
+});
+
 app.use("/", healthRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/batch", batchRoutes);
 app.use("/api/batches", batchRoutes);
-app.use("/api/tasks", taskRoutes);
-
-app.get("/", (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: "Batch-It Backend running",
-  });
-});
 
 app.use(notFound);
 app.use(errorHandler);

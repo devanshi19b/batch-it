@@ -1,18 +1,18 @@
+const isValidEmail = (value) =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+
 const isNonEmptyString = (value) =>
   typeof value === "string" && value.trim().length > 0;
 
 const isPositiveNumber = (value) => {
-  const parsedValue = Number(value);
-  return Number.isFinite(parsedValue) && parsedValue > 0;
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0;
 };
 
 const parseValidDate = (value) => {
-  const parsedDate = new Date(value);
-  return Number.isNaN(parsedDate.getTime()) ? null : parsedDate;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
 };
-
-const isValidEmail = (value) =>
-  typeof value === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
 module.exports = {
   isNonEmptyString,

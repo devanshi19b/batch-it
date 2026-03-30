@@ -1,27 +1,24 @@
 const express = require("express");
-const router = express.Router();
-
 const {
-  createBatch,
-  getAllBatches,
+  addItem,
+  closeBatchRecord,
+  createBatchRecord,
+  getAllBatchRecords,
   getBatchById,
-  addItemToBatch,
-  removeItemFromBatch,
-  closeBatch,
-  getBatchSummary
+  getBatchSummary,
+  removeItem,
 } = require("../controllers/batch.controller");
-
 const { protect } = require("../middleware/auth.middleware");
 
-// Public routes
-router.get("/", getAllBatches);
+const router = express.Router();
+
+router.get("/", getAllBatchRecords);
 router.get("/:batchId", getBatchById);
 router.get("/:batchId/summary", getBatchSummary);
 
-// Protected routes
-router.post("/create", protect, createBatch);
-router.post("/:batchId/items", protect, addItemToBatch);
-router.delete("/:batchId/items/:itemId", protect, removeItemFromBatch);
-router.patch("/:batchId/close", protect, closeBatch);
+router.post("/create", protect, createBatchRecord);
+router.post("/:batchId/items", protect, addItem);
+router.delete("/:batchId/items/:itemId", protect, removeItem);
+router.patch("/:batchId/close", protect, closeBatchRecord);
 
 module.exports = router;

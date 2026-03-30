@@ -1,23 +1,20 @@
-const notFound = (req, res, next) => {
-  const error = new Error(`Route not found: ${req.method} ${req.originalUrl}`);
-  error.statusCode = 404;
-  next(error);
+const AppError = require("../utils/appError");
+
+const notFound = (req, _res, next) => {
+  next(new AppError(`Route ${req.originalUrl} was not found.`, 404));
 };
 
-const errorHandler = (err, req, res, next) => {
-  const statusCode = err.statusCode || 500;
+const errorHandler = (error, _req, res, _next) => {
+  const statusCode = error.statusCode || 500;
 
-  if (res.headersSent) {
-    return next(err);
-  }
-
-  res.status(statusCode).json({
+  return res.status(statusCode).json({
     success: false,
-    message: err.message || "Internal Server Error",
+    message: error.message || "Internal server error.",
+    ...(error.details ? { details: error.details } : {}),
   });
 };
 
 module.exports = {
-  notFound,
   errorHandler,
+  notFound,
 };

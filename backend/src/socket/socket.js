@@ -14,19 +14,15 @@ const initSocket = (server) => {
 
   ioInstance.on("connection", (socket) => {
     socket.on("batch:join", (batchId) => {
-      if (!batchId) {
-        return;
+      if (batchId) {
+        socket.join(getBatchRoom(batchId));
       }
-
-      socket.join(getBatchRoom(batchId));
     });
 
     socket.on("batch:leave", (batchId) => {
-      if (!batchId) {
-        return;
+      if (batchId) {
+        socket.leave(getBatchRoom(batchId));
       }
-
-      socket.leave(getBatchRoom(batchId));
     });
   });
 

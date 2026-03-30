@@ -1,32 +1,42 @@
 const jwt = require("jsonwebtoken");
+const { findUserById } = require("../repositories/user.repository");
+const { JWT_SECRET } = require("../config/env");
+const AppError = require("../utils/appError");
+const asyncHandler = require("../utils/asyncHandler");
 
-exports.protect = (req, res, next) => {
+const protect = asyncHandler(async (req, _res, next) => {
   const authorization = req.headers.authorization || "";
 
   if (!authorization.startsWith("Bearer ")) {
-    return res.status(401).json({
-      success: false,
-      message: "No token provided",
-    });
+    throw new AppError("Authentication token is required.", 401);
   }
 
-  if (!process.env.JWT_SECRET) {
-    return res.status(500).json({
-      success: false,
-      message: "JWT secret is not configured",
-    });
-  }
+  const token = authorization.split(" ")[1];
+
+  let decoded;
 
   try {
-    const token = authorization.split(" ")[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-
-    req.user = decoded;
-    return next();
-  } catch (error) {
-    return res.status(401).json({
-      success: false,
-      message: "Invalid token",
-    });
+    decoded = jwt.verify(token, JWT_SECRET);
+  } catch {
+    throw new AppError("Invalid or expired authentication token.", 401);
   }
+
+  const user = await findUserById(decoded.id);
+
+  if (!user) {
+    throw new AppError("The authenticated user no longer exists.", 401);
+  }
+
+  req.user = {
+    id: user._id?.toString?.() || user.id,
+    role: user.role,
+    name: user.name,
+    email: user.email,
+  };
+
+  next();
+});
+
+module.exports = {
+  protect,
 };

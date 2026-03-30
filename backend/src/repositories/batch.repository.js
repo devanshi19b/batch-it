@@ -1,112 +1,110 @@
 const mongoose = require("mongoose");
-const Batch = require("../models/batch");
-const { isDatabaseReady } = require("../config/db");
-const {
-  createId,
-  sortByCreatedAtDesc,
-  store,
-  timestamp,
-  toPlainObject,
-} = require("../data/memoryStore");
+const Batch = require("../models/Batch");
+const { isMemoryModeEnabled } = require("../config/db");
+const { clone, createId, store, timestamp } = require("../utils/memoryStore");
 
-const isValidObjectId = (value) => mongoose.Types.ObjectId.isValid(value);
-
-const sanitizeUserReference = (user) => {
+const serializeUser = (user) => {
   if (!user) {
     return null;
   }
 
-  const userId = user._id?.toString?.() || user.id || user;
-
   return {
-    id: userId,
+    id: user._id?.toString?.() || user.id || user._id || user,
     name: user.name || "Unknown user",
     email: user.email || "",
-    role: user.role || "student",
+    role: user.role || "member",
   };
 };
 
-const enrichUserReference = (value) => {
-  if (!value) {
-    return null;
-  }
-
-  if (typeof value === "object" && (value._id || value.id)) {
-    return sanitizeUserReference(value);
-  }
-
-  const match = store.users.find((entry) => {
-    const entryId = entry._id?.toString?.() || entry.id;
-    const lookupId = value._id?.toString?.() || value.id || value;
-    return entryId === lookupId;
-  });
-
-  return sanitizeUserReference(match || value);
+const findMemoryUser = (value) => {
+  const userId = value?._id?.toString?.() || value?.id || value;
+  return store.users.find((entry) => entry._id === userId) || null;
 };
 
-const normalizeBatch = (batch) => {
+const normalizeMongoBatch = (batch) => {
   if (!batch) {
     return null;
   }
 
-  if (typeof batch.toObject === "function") {
-    return batch.toObject();
-  }
-
-  return toPlainObject(batch);
-};
-
-const enrichBatchUsers = (batch) => {
-  if (!batch) {
-    return null;
-  }
+  const plain = typeof batch.toObject === "function" ? batch.toObject() : batch;
 
   return {
-    ...batch,
-    initiator: enrichUserReference(batch.initiator),
-    items: (batch.items || []).map((item) => ({
+    ...plain,
+    _id: plain._id?.toString?.() || plain._id,
+    initiator: serializeUser(plain.initiator),
+    items: (plain.items || []).map((item) => ({
       ...item,
-      user: enrichUserReference(item.user),
+      _id: item._id?.toString?.() || item._id,
+      user: serializeUser(item.user),
+    })),
+  };
+};
+
+const normalizeMemoryBatch = (batch) => {
+  if (!batch) {
+    return null;
+  }
+
+  const plain = clone(batch);
+
+  return {
+    ...plain,
+    initiator: serializeUser(findMemoryUser(plain.initiator)),
+    items: (plain.items || []).map((item) => ({
+      ...item,
+      user: serializeUser(findMemoryUser(item.user)),
     })),
   };
 };
 
 const populateBatchQuery = (query) =>
-  query.populate("initiator", "name email role").populate("items.user", "name email role");
+  query
+    .populate("initiator", "name email role")
+    .populate("items.user", "name email role");
 
-const getAllBatchRecords = async () => {
-  if (isDatabaseReady()) {
+const getAllBatches = async () => {
+  if (!isMemoryModeEnabled()) {
     const batches = await populateBatchQuery(Batch.find().sort({ createdAt: -1 }));
-    return batches.map((batch) => enrichBatchUsers(normalizeBatch(batch)));
+    return batches.map(normalizeMongoBatch);
   }
 
-  return sortByCreatedAtDesc(store.batches).map((batch) =>
-    enrichBatchUsers(toPlainObject(batch))
-  );
+  return clone(store.batches)
+    .sort((left, right) => new Date(right.createdAt) - new Date(left.createdAt))
+    .map(normalizeMemoryBatch);
 };
 
 const findBatchById = async (batchId) => {
-  if (!isValidObjectId(batchId)) {
+  if (!batchId) {
     return null;
   }
 
-  if (isDatabaseReady()) {
+  if (!isMemoryModeEnabled()) {
+    if (!mongoose.Types.ObjectId.isValid(batchId)) {
+      return null;
+    }
+
     const batch = await populateBatchQuery(Batch.findById(batchId));
-    return enrichBatchUsers(normalizeBatch(batch));
+    return normalizeMongoBatch(batch);
   }
 
   const batch = store.batches.find((entry) => entry._id === batchId);
-  return batch ? enrichBatchUsers(toPlainObject(batch)) : null;
+  return normalizeMemoryBatch(batch);
 };
 
-const createBatchRecord = async ({ initiator, buildingId, restaurantName, items, expiresAt }) => {
-  if (isDatabaseReady()) {
+const createBatch = async ({
+  initiator,
+  buildingId,
+  restaurantName,
+  expiresAt,
+  items,
+}) => {
+  if (!isMemoryModeEnabled()) {
     const batch = await Batch.create({
       initiator,
       buildingId,
       restaurantName,
-      items,
       expiresAt,
+      items,
     });
 
     return findBatchById(batch._id.toString());
@@ -118,30 +116,31 @@ const createBatchRecord = async ({ initiator, buildingId, restaurantName, items,
     initiator,
     buildingId,
     restaurantName,
+    expiresAt,
+    status: "LIVE",
+    createdAt: now,
+    updatedAt: now,
     items: (items || []).map((item) => ({
       _id: createId(),
       name: item.name,
-      quantity: item.quantity,
-      price: item.price,
+      quantity: Number(item.quantity),
+      price: Number(item.price),
       user: item.user,
+      createdAt: now,
+      updatedAt: now,
     })),
-    status: "LIVE",
-    expiresAt,
-    createdAt: now,
-    updatedAt: now,
   };
 
-  store.batches.push(batch);
-
-  return enrichBatchUsers(toPlainObject(batch));
+  store.batches.unshift(batch);
+  return normalizeMemoryBatch(batch);
 };
 
-const addItemToBatchRecord = async (batchId, item) => {
-  if (!isValidObjectId(batchId)) {
-    return null;
-  }
+const addItemToBatch = async (batchId, item) => {
+  if (!isMemoryModeEnabled()) {
+    if (!mongoose.Types.ObjectId.isValid(batchId)) {
+      return null;
+    }
 
-  if (isDatabaseReady()) {
     const batch = await Batch.findById(batchId);
 
     if (!batch) {
@@ -159,33 +158,34 @@ const addItemToBatchRecord = async (batchId, item) => {
     return null;
   }
 
+  const now = timestamp();
   batch.items.push({
     _id: createId(),
     name: item.name,
-    quantity: item.quantity,
-    price: item.price,
+    quantity: Number(item.quantity),
+    price: Number(item.price),
     user: item.user,
+    createdAt: now,
+    updatedAt: now,
   });
-  batch.updatedAt = timestamp();
+  batch.updatedAt = now;
 
-  return enrichBatchUsers(toPlainObject(batch));
+  return normalizeMemoryBatch(batch);
 };
 
-const removeItemFromBatchRecord = async (batchId, itemId) => {
-  if (!isValidObjectId(batchId)) {
-    return null;
-  }
+const removeItemFromBatch = async (batchId, itemId) => {
+  if (!isMemoryModeEnabled()) {
+    if (!mongoose.Types.ObjectId.isValid(batchId)) {
+      return null;
+    }
 
-  if (isDatabaseReady()) {
     const batch = await Batch.findById(batchId);
 
     if (!batch) {
       return null;
     }
 
-    batch.items = batch.items.filter(
-      (item) => item._id.toString() !== itemId
-    );
+    batch.items = batch.items.filter((item) => item._id.toString() !== itemId);
     await batch.save();
     return findBatchById(batchId);
   }
@@ -198,16 +198,15 @@ const removeItemFromBatchRecord = async (batchId, itemId) => {
 
   batch.items = batch.items.filter((item) => item._id !== itemId);
   batch.updatedAt = timestamp();
-
-  return enrichBatchUsers(toPlainObject(batch));
+  return normalizeMemoryBatch(batch);
 };
 
-const closeBatchRecord = async (batchId) => {
-  if (!isValidObjectId(batchId)) {
-    return null;
-  }
+const closeBatch = async (batchId) => {
+  if (!isMemoryModeEnabled()) {
+    if (!mongoose.Types.ObjectId.isValid(batchId)) {
+      return null;
+    }
 
-  if (isDatabaseReady()) {
     const batch = await Batch.findById(batchId);
 
     if (!batch) {
@@ -227,15 +226,14 @@ const closeBatchRecord = async (batchId) => {
 
   batch.status = "CLOSED";
   batch.updatedAt = timestamp();
-
-  return enrichBatchUsers(toPlainObject(batch));
+  return normalizeMemoryBatch(batch);
 };
 
 module.exports = {
-  addItemToBatchRecord,
-  closeBatchRecord,
-  createBatchRecord,
+  addItemToBatch,
+  closeBatch,
+  createBatch,
   findBatchById,
-  getAllBatchRecords,
-  removeItemFromBatchRecord,
+  getAllBatches,
+  removeItemFromBatch,
 };

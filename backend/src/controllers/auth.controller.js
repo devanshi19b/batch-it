@@ -1,10 +1,11 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const {
-  createUser,
-  findUserByEmail,
-} = require("../repositories/user.repository");
-const { isValidEmail } = require("../utils/validation");
+const { createUser, findUserByEmail } = require("../repositories/user.repository");
+const { sendSuccess } = require("../utils/apiResponse");
+const AppError = require("../utils/appError");
+const asyncHandler = require("../utils/asyncHandler");
+const { JWT_SECRET, TOKEN_EXPIRES_IN } = require("../config/env");
+const { isNonEmptyString, isValidEmail } = require("../utils/validation");
 
 const sanitizeUser = (user) => ({
   id: user._id?.toString?.() || user.id,
@@ -13,93 +14,85 @@ const sanitizeUser = (user) => ({
   role: user.role,
 });
 
-const issueToken = (user) =>
-  jwt.sign({ id: user._id?.toString?.() || user.id, role: user.role }, process.env.JWT_SECRET, {
-    expiresIn: "7d",
+const signToken = (user) =>
+  jwt.sign(
+    {
+      id: user._id?.toString?.() || user.id,
+      role: user.role,
+    },
+    JWT_SECRET,
+    { expiresIn: TOKEN_EXPIRES_IN }
+  );
+
+const register = asyncHandler(async (req, res) => {
+  const { name, email, password } = req.body;
+  const normalizedName = String(name || "").trim();
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+
+  if (!isNonEmptyString(normalizedName)) {
+    throw new AppError("Name is required.", 400);
+  }
+
+  if (!isValidEmail(normalizedEmail)) {
+    throw new AppError("A valid email address is required.", 400);
+  }
+
+  if (!password || String(password).length < 6) {
+    throw new AppError("Password must be at least 6 characters long.", 400);
+  }
+
+  const existingUser = await findUserByEmail(normalizedEmail);
+  if (existingUser) {
+    throw new AppError("A user with that email already exists.", 409);
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+  const user = await createUser({
+    name: normalizedName,
+    email: normalizedEmail,
+    password: hashedPassword,
   });
 
-// Register
-exports.register = async (req, res) => {
-  try {
-    const { name, email, password } = req.body;
-    const normalizedName = typeof name === "string" ? name.trim() : "";
-    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
-
-    if (!normalizedName || !normalizedEmail || !password) {
-      return res.status(400).json({ message: "name, email and password are required" });
-    }
-
-    if (!isValidEmail(normalizedEmail)) {
-      return res.status(400).json({ message: "A valid email address is required" });
-    }
-
-    if (String(password).length < 6) {
-      return res
-        .status(400)
-        .json({ message: "Password must be at least 6 characters long" });
-    }
-
-    if (!process.env.JWT_SECRET) {
-      return res.status(500).json({ message: "JWT secret is not configured" });
-    }
-
-    const userExists = await findUserByEmail(normalizedEmail);
-    if (userExists) {
-      return res.status(409).json({ message: "User already exists" });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const user = await createUser({
-      name: normalizedName,
-      email: normalizedEmail,
-      password: hashedPassword,
-    });
-
-    const token = issueToken(user);
-
-    res.status(201).json({
-      message: "User registered successfully",
-      token,
+  return sendSuccess(res, {
+    statusCode: 201,
+    message: "User registered successfully.",
+    data: {
+      token: signToken(user),
       user: sanitizeUser(user),
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message || "Server Error" });
+    },
+  });
+});
+
+const login = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+
+  if (!isValidEmail(normalizedEmail) || !password) {
+    throw new AppError("Email and password are required.", 400);
   }
-};
 
-// Login
-exports.login = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    const normalizedEmail = typeof email === "string" ? email.trim().toLowerCase() : "";
+  const user = await findUserByEmail(normalizedEmail);
 
-    if (!normalizedEmail || !password) {
-      return res.status(400).json({ message: "email and password are required" });
-    }
+  if (!user) {
+    throw new AppError("Invalid email or password.", 401);
+  }
 
-    if (!process.env.JWT_SECRET) {
-      return res.status(500).json({ message: "JWT secret is not configured" });
-    }
+  const passwordMatches = await bcrypt.compare(password, user.password);
 
-    const user = await findUserByEmail(normalizedEmail);
-    if (!user) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
+  if (!passwordMatches) {
+    throw new AppError("Invalid email or password.", 401);
+  }
 
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    const token = issueToken(user);
-
-    res.json({
-      message: "Login successful",
-      token,
+  return sendSuccess(res, {
+    message: "Login successful.",
+    data: {
+      token: signToken(user),
       user: sanitizeUser(user),
-    });
-  } catch (error) {
-    res.status(500).json({ message: error.message || "Server Error" });
-  }
+    },
+  });
+});
+
+module.exports = {
+  login,
+  register,
 };
