@@ -49,6 +49,13 @@ const buildBatchSummary = (batch) =>
     }
   );
 
+const getActorId = (value) => value?._id?.toString?.() || value?.id || value;
+
+const isBatchExpired = (batch) => {
+  const expiresAt = new Date(batch?.expiresAt).getTime();
+  return Number.isFinite(expiresAt) && expiresAt <= Date.now();
+};
+
 const getBatchSummary = asyncHandler(async (req, res) => {
   const batch = await findBatchById(req.params.batchId);
 
@@ -103,6 +110,10 @@ const createBatchRecord = asyncHandler(async (req, res) => {
     throw new AppError("A valid expiresAt date is required.", 400);
   }
 
+  if (parsedExpiry.getTime() <= Date.now()) {
+    throw new AppError("expiresAt must be in the future.", 400);
+  }
+
   const normalizedItems = Array.isArray(items) ? items : [];
   for (const item of normalizedItems) {
     const validationMessage = validateItemPayload(item || {});
@@ -152,6 +163,10 @@ const addItem = asyncHandler(async (req, res) => {
     throw new AppError("This batch is already closed.", 400);
   }
 
+  if (isBatchExpired(existingBatch)) {
+    throw new AppError("This batch has passed its deadline and can no longer be edited.", 400);
+  }
+
   const updatedBatch = await addItemToBatch(batchId, {
     name: String(req.body.name).trim(),
     quantity: Number(req.body.quantity),
@@ -185,6 +200,19 @@ const removeItem = asyncHandler(async (req, res) => {
     throw new AppError("Closed batches cannot be edited.", 400);
   }
 
+  if (isBatchExpired(batch)) {
+    throw new AppError("This batch has passed its deadline and can no longer be edited.", 400);
+  }
+
+  const targetItem = (batch.items || []).find((item) => item._id === itemId);
+  const actorId = getActorId(req.user.id);
+  const initiatorId = getActorId(batch.initiator);
+  const itemOwnerId = getActorId(targetItem?.user);
+
+  if (actorId !== initiatorId && actorId !== itemOwnerId) {
+    throw new AppError("You can only remove your own items unless you created the batch.", 403);
+  }
+
   const updatedBatch = await removeItemFromBatch(batchId, itemId);
   emitBatchUpdated(updatedBatch, "item_removed");
 
@@ -203,6 +231,10 @@ const closeBatchRecord = asyncHandler(async (req, res) => {
 
   if (batch.status === "CLOSED") {
     throw new AppError("Batch is already closed.", 400);
+  }
+
+  if (getActorId(batch.initiator) !== getActorId(req.user.id)) {
+    throw new AppError("Only the batch creator can close this batch.", 403);
   }
 
   const updatedBatch = await closeBatch(req.params.batchId);

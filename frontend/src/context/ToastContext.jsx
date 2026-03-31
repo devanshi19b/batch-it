@@ -1,7 +1,6 @@
-import { createContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import ToastViewport from "../components/ToastViewport";
-
-export const ToastContext = createContext(null);
+import { ToastContext } from "./toast-context";
 
 const createToastId = () => {
   if (typeof crypto !== "undefined" && crypto.randomUUID) {

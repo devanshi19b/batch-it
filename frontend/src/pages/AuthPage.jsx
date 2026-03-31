@@ -14,13 +14,13 @@ const loginDefaults = {
 
 const demoCredentials = {
   login: {
-    email: "eve.holt@reqres.in",
-    password: "cityslicka",
+    email: "demo@batchit.local",
+    password: "demopass",
   },
   register: {
-    name: "Eve Holt",
-    email: "eve.holt@reqres.in",
-    password: "pistol",
+    name: "Demo Workspace User",
+    email: "demo@batchit.local",
+    password: "demopass",
   },
 };
 
@@ -139,8 +139,8 @@ export default function AuthPage() {
                   : "Create a workspace in minutes."}
               </h2>
               <p className="text-sm leading-7 text-slate-400">
-                Primary auth uses your backend first, then falls back to ReqRes
-                for UI demos if the API is unavailable.
+                Primary auth uses your backend first, then falls back to a
+                local demo workspace if the API is unavailable.
               </p>
             </div>
 
@@ -211,7 +211,7 @@ export default function AuthPage() {
                     Want to test fallback mode?
                   </p>
                   <p className="mt-1 text-sm text-slate-400">
-                    Fill the known ReqRes demo credentials for {mode}.
+                    Fill demo credentials for local fallback mode.
                   </p>
                 </div>
                 <button

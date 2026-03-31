@@ -1,5 +1,11 @@
-import { CircleSlash2, Clock3, RefreshCw, Sparkles } from "lucide-react";
-import { startTransition, useEffect, useState } from "react";
+import {
+  CircleSlash2,
+  Clock3,
+  RefreshCw,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
+import { startTransition, useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import ActivityFeed from "../components/ActivityFeed";
 import AddItemComposer from "../components/AddItemComposer";
@@ -14,11 +20,13 @@ import { useBatchRoom } from "../hooks/useBatchSocket";
 import { useToast } from "../hooks/useToast";
 import {
   addItemToBatch,
+  removeItemFromBatch,
   closeBatch,
   fetchBatchById,
   fetchBatchSummary,
 } from "../services/batchService";
 import { extractErrorMessage } from "../services/api";
+import { buildBatchSummary, getEntityId } from "../utils/batch";
 import { formatDateTime, getTimeRemaining } from "../utils/format";
 
 const eventCopy = {
@@ -39,7 +47,7 @@ export default function BatchDetailPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const loadBatch = async () => {
+  const loadBatch = useCallback(async () => {
     setLoading(true);
 
     try {
@@ -60,22 +68,22 @@ export default function BatchDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [batchId, session]);
 
   useEffect(() => {
-    loadBatch();
-  }, [batchId]);
+    void loadBatch();
+  }, [loadBatch]);
 
   useBatchRoom({
     batchId,
-    enabled: source === "backend" && session?.provider !== "reqres",
+    enabled: source === "backend" && session?.provider !== "demo",
     onUpdate: (payload) => {
       if (!payload?.batch) {
         return;
       }
 
       setBatch(payload.batch);
-      setSummary(null);
+      setSummary(buildBatchSummary(payload.batch));
       pushToast({
         title: "Live update",
         description: eventCopy[payload.eventType] || "This batch changed.",
@@ -94,7 +102,7 @@ export default function BatchDetailPage() {
       setSource(result.source);
       const nextSummary = await fetchBatchSummary(batchId, {
         ...session,
-        provider: result.source === "demo" ? "reqres" : session?.provider,
+        provider: result.source === "demo" ? "demo" : session?.provider,
       });
       setSummary(nextSummary.data);
 
@@ -113,6 +121,34 @@ export default function BatchDetailPage() {
         tone: "error",
       });
       throw submitError;
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleRemoveItem = async (itemId) => {
+    setActionLoading(true);
+
+    try {
+      const result = await removeItemFromBatch(batchId, itemId, session);
+      setBatch(result.data);
+      setSource(result.source);
+      setSummary(buildBatchSummary(result.data));
+
+      pushToast({
+        title: "Item removed",
+        description:
+          result.source === "backend"
+            ? "The batch totals were updated for everyone."
+            : "Removed from local demo mode.",
+        tone: result.source === "backend" ? "success" : "warning",
+      });
+    } catch (removeError) {
+      pushToast({
+        title: "Unable to remove item",
+        description: extractErrorMessage(removeError, "Please try again."),
+        tone: "error",
+      });
     } finally {
       setActionLoading(false);
     }
@@ -169,6 +205,7 @@ export default function BatchDetailPage() {
   }
 
   const time = getTimeRemaining(batch.expiresAt);
+  const isBatchOwner = getEntityId(batch.initiator) === getEntityId(user?.id);
 
   return (
     <div className="space-y-6">
@@ -207,11 +244,15 @@ export default function BatchDetailPage() {
             <button
               className="button-secondary"
               onClick={handleCloseBatch}
-              disabled={batch.status === "CLOSED" || actionLoading}
+              disabled={!isBatchOwner || batch.status === "CLOSED" || actionLoading}
               type="button"
             >
               <CircleSlash2 size={16} />
-              {batch.status === "CLOSED" ? "Batch closed" : "Close batch"}
+              {batch.status === "CLOSED"
+                ? "Batch closed"
+                : isBatchOwner
+                  ? "Close batch"
+                  : "Owner can close"}
             </button>
           </div>
         </div>
@@ -231,7 +272,13 @@ export default function BatchDetailPage() {
 
         <div className="space-y-6">
           <ActivityFeed batch={batch} />
-          <BatchItemList batch={batch} />
+          <BatchItemList
+            actionIcon={Trash2}
+            batch={batch}
+            currentUserId={user?.id}
+            onRemoveItem={handleRemoveItem}
+            removing={actionLoading}
+          />
         </div>
 
         <div className="xl:sticky xl:top-6 xl:self-start">
@@ -240,7 +287,7 @@ export default function BatchDetailPage() {
       </div>
 
       <AddItemComposer
-        disabled={batch.status === "CLOSED"}
+        disabled={batch.status === "CLOSED" || time.isExpired}
         onSubmit={handleAddItem}
         pending={actionLoading}
       />

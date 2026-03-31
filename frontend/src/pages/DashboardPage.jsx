@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import {
   startTransition,
+  useCallback,
   useDeferredValue,
   useEffect,
   useState,
@@ -35,36 +36,39 @@ export default function DashboardPage() {
   const [error, setError] = useState("");
   const deferredSearch = useDeferredValue(search.trim().toLowerCase());
 
-  const loadBatches = async ({ silent = false } = {}) => {
-    if (silent) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
+  const loadBatches = useCallback(
+    async ({ silent = false } = {}) => {
+      if (silent) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
 
-    try {
-      const result = await fetchBatches(session);
+      try {
+        const result = await fetchBatches(session);
 
-      startTransition(() => {
-        setBatches(result.data);
-        setSource(result.source);
-      });
+        startTransition(() => {
+          setBatches(result.data);
+          setSource(result.source);
+        });
 
-      setError("");
-    } catch (loadError) {
-      setError(extractErrorMessage(loadError, "Unable to load batches."));
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+        setError("");
+      } catch (loadError) {
+        setError(extractErrorMessage(loadError, "Unable to load batches."));
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [session]
+  );
 
   useEffect(() => {
-    loadBatches();
-  }, []);
+    void loadBatches();
+  }, [loadBatches]);
 
   useBatchesFeed({
-    enabled: source === "backend" && session?.provider !== "reqres",
+    enabled: source === "backend" && session?.provider !== "demo",
     onChange: async () => {
       await loadBatches({ silent: true });
     },

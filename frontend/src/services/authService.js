@@ -1,14 +1,4 @@
-import axios from "axios";
-import { api, canFallbackToDemo, extractErrorMessage } from "./api";
-
-const reqresClient = axios.create({
-  baseURL: "https://reqres.in/api",
-  timeout: 10000,
-});
-
-const reqresHeaders = import.meta.env.VITE_REQRES_API_KEY
-  ? { "x-api-key": import.meta.env.VITE_REQRES_API_KEY }
-  : {};
+import { api, canFallbackToDemo } from "./api";
 
 const mapBackendAuth = (data) => ({
   token: data.data.token,
@@ -17,25 +7,23 @@ const mapBackendAuth = (data) => ({
   message: data.message,
 });
 
-const mapReqresAuth = (mode, payload, data) => ({
-  token: data.token,
+const createDemoToken = (payload) =>
+  `demo-${btoa(`${payload.email}:${Date.now()}`).replaceAll("=", "")}`;
+
+const mapDemoAuth = (mode, payload) => ({
+  token: createDemoToken(payload),
   user: {
-    id: data.id || `reqres-${payload.email}`,
+    id: `demo-${payload.email}`,
     name: payload.name || "Demo Workspace User",
     email: payload.email,
     role: "demo",
   },
-  provider: "reqres",
+  provider: "demo",
   message:
     mode === "login"
-      ? "Signed in with ReqRes fallback mode."
-      : "Registered with ReqRes fallback mode.",
+      ? "Signed in with local demo mode because the backend was unavailable."
+      : "Registered with local demo mode because the backend was unavailable.",
 });
-
-const getReqresHint = (mode) =>
-  mode === "login"
-    ? "Use eve.holt@reqres.in with password cityslicka for the demo fallback."
-    : "Use eve.holt@reqres.in with password pistol for the demo fallback.";
 
 const authenticate = async (mode, payload) => {
   try {
@@ -46,24 +34,7 @@ const authenticate = async (mode, payload) => {
       throw backendError;
     }
 
-    try {
-      const { data } = await reqresClient.post(
-        `/${mode}`,
-        {
-          email: payload.email,
-          password: payload.password,
-        },
-        { headers: reqresHeaders }
-      );
-
-      return mapReqresAuth(mode, payload, data);
-    } catch (reqresError) {
-      const wrappedError = new Error(
-        `${extractErrorMessage(reqresError, "Unable to authenticate.")} ${getReqresHint(mode)}`
-      );
-      wrappedError.userMessage = wrappedError.message;
-      throw wrappedError;
-    }
+    return mapDemoAuth(mode, payload);
   }
 };
 

@@ -100,7 +100,7 @@ export function AuthProvider({ children }) {
         token: session?.token ?? null,
         provider: session?.provider ?? "backend",
         isAuthenticated: Boolean(session?.token),
-        isDemoMode: session?.provider === "reqres",
+        isDemoMode: session?.provider === "demo",
         loading,
         login,
         register,

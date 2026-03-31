@@ -58,3 +58,29 @@ export const calculateBatchMetrics = (batch) => {
     activity,
   };
 };
+
+export const buildBatchSummary = (batch) => {
+  const metrics = calculateBatchMetrics(batch);
+
+  return {
+    batchId: batch?._id,
+    totalItems: metrics.totalItems,
+    totalAmount: metrics.totalAmount,
+  };
+};
+
+export const getEntityId = (value) => value?.id || value?._id || value || null;
+
+export const canRemoveBatchItem = ({ batch, currentUserId, itemUser }) => {
+  const actorId = getEntityId(currentUserId);
+  const initiatorId = getEntityId(batch?.initiator);
+  const itemOwnerId = getEntityId(itemUser);
+  const expiresAt = new Date(batch?.expiresAt).getTime();
+  const isExpired = Number.isFinite(expiresAt) && expiresAt <= Date.now();
+
+  if (!actorId || batch?.status === "CLOSED" || isExpired) {
+    return false;
+  }
+
+  return actorId === initiatorId || actorId === itemOwnerId;
+};

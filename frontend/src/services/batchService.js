@@ -5,10 +5,11 @@ import {
   getDemoBatchById,
   getDemoBatches,
   getDemoSummary,
+  removeDemoItem,
 } from "./demoService";
 import { api, canFallbackToDemo } from "./api";
 
-const isDemoSession = (session) => session?.provider === "reqres";
+const isDemoSession = (session) => session?.provider === "demo";
 
 const wrapResult = (data, source) => ({ data, source });
 
@@ -94,6 +95,23 @@ export const addItemToBatch = async (batchId, payload, session) => {
     }
 
     return wrapResult(await addDemoItem(batchId, payload, session?.user), "demo");
+  }
+};
+
+export const removeItemFromBatch = async (batchId, itemId, session) => {
+  if (isDemoSession(session)) {
+    return wrapResult(await removeDemoItem(batchId, itemId), "demo");
+  }
+
+  try {
+    const response = await api.delete(`/batch/${batchId}/items/${itemId}`);
+    return wrapResult(response.data.data, "backend");
+  } catch (error) {
+    if (!canFallbackToDemo(error)) {
+      throw error;
+    }
+
+    return wrapResult(await removeDemoItem(batchId, itemId), "demo");
   }
 };
 

@@ -1,7 +1,13 @@
-import { calculateBatchMetrics } from "../utils/batch";
+import { calculateBatchMetrics, canRemoveBatchItem } from "../utils/batch";
 import { formatCurrency, formatDateTime } from "../utils/format";
 
-export default function BatchItemList({ batch }) {
+export default function BatchItemList({
+  actionIcon: ActionIcon,
+  batch,
+  currentUserId,
+  onRemoveItem,
+  removing,
+}) {
   const { activity } = calculateBatchMetrics(batch);
 
   return (
@@ -39,6 +45,22 @@ export default function BatchItemList({ batch }) {
                   {formatCurrency(entry.amount)}
                 </p>
               </div>
+              {typeof onRemoveItem === "function" &&
+              canRemoveBatchItem({
+                batch,
+                currentUserId,
+                itemUser: entry.user,
+              }) ? (
+                <button
+                  className="button-secondary !px-4"
+                  disabled={removing}
+                  onClick={() => onRemoveItem(entry.id)}
+                  type="button"
+                >
+                  {ActionIcon ? <ActionIcon size={16} /> : null}
+                  Remove
+                </button>
+              ) : null}
             </div>
           ))
         ) : (

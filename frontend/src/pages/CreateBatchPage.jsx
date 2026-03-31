@@ -261,12 +261,12 @@ export default function CreateBatchPage() {
             Data mode
           </p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">
-            {session?.provider === "reqres" ? "Demo fallback" : "Backend-first"}
+            {session?.provider === "demo" ? "Demo fallback" : "Backend-first"}
           </h2>
           <p className="mt-3 text-sm leading-7 text-slate-400">
             Protected writes use your backend when you are signed in with a real
-            JWT. ReqRes sign-in automatically routes create and add-item flows
-            into demo storage so the interface remains interactive.
+            JWT. Demo sign-in automatically routes create and add-item flows
+            into local storage so the interface remains interactive.
           </p>
         </div>
       </aside>

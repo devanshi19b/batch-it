@@ -216,6 +216,31 @@ export const addDemoItem = async (batchId, payload, user) => {
   return clone(batches[index]);
 };
 
+export const removeDemoItem = async (batchId, itemId) => {
+  const batches = readBatches();
+  const index = getBatchIndex(batches, batchId);
+
+  if (index === -1) {
+    throw createDemoError("Batch not found in demo workspace.", 404);
+  }
+
+  if (batches[index].status === "CLOSED") {
+    throw createDemoError("This batch is already closed.", 400);
+  }
+
+  const nextItems = batches[index].items.filter((item) => item._id !== itemId);
+
+  if (nextItems.length === batches[index].items.length) {
+    throw createDemoError("Item not found in demo workspace.", 404);
+  }
+
+  batches[index].items = nextItems;
+  batches[index].updatedAt = new Date().toISOString();
+
+  writeBatches(batches);
+  return clone(batches[index]);
+};
+
 export const closeDemoBatch = async (batchId) => {
   const batches = readBatches();
   const index = getBatchIndex(batches, batchId);
