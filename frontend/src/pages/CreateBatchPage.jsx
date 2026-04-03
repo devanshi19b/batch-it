@@ -106,14 +106,15 @@ export default function CreateBatchPage() {
   };
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+    <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr] stagger-enter">
       <section className="glass-panel-strong rounded-[32px] p-6 sm:p-8">
         <div className="max-w-2xl">
           <p className="text-xs uppercase tracking-[0.24em] text-cyan-100">
             Create batch
           </p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-white">
-            Open a new ordering window with structure from the start.
+          <h1 className="mt-3 text-4xl font-semibold tracking-tight">
+            <span className="text-gradient">Open a new ordering window</span>{" "}
+            <span className="text-white">with structure from the start.</span>
           </h1>
           <p className="mt-4 text-base leading-7 text-slate-400">
             Set the restaurant, the delivery zone, and the closeout deadline.
@@ -185,10 +186,11 @@ export default function CreateBatchPage() {
             </div>
 
             <div className="space-y-4">
-              {form.items.map((item) => (
+              {form.items.map((item, index) => (
                 <div
-                  className="grid gap-3 rounded-[24px] border border-white/8 bg-slate-950/40 p-4 md:grid-cols-[1fr_140px_140px_auto]"
+                  className="grid gap-3 rounded-[24px] border border-white/8 bg-slate-950/40 p-4 transition-all duration-300 hover:border-white/14 md:grid-cols-[1fr_140px_140px_auto]"
                   key={item.id}
+                  style={{ animationDelay: `${index * 0.06}s` }}
                 >
                   <input
                     className="input-shell"
@@ -232,13 +234,20 @@ export default function CreateBatchPage() {
           </div>
 
           {error ? (
-            <div className="rounded-[20px] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-100">
+            <div className="rounded-[20px] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-100 animate-[fadeSlideUp_0.3s_ease]">
               {error}
             </div>
           ) : null}
 
           <button className="button-primary" disabled={submitting} type="submit">
-            <Plus size={18} />
+            {submitting ? (
+              <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+            ) : (
+              <Plus size={18} />
+            )}
             {submitting ? "Creating batch..." : "Launch batch"}
           </button>
         </form>
@@ -249,10 +258,19 @@ export default function CreateBatchPage() {
           <p className="text-xs uppercase tracking-[0.24em] text-slate-500">
             Launch checklist
           </p>
-          <div className="mt-4 space-y-4 text-sm leading-7 text-slate-300">
-            <p>1. Choose the restaurant and delivery zone.</p>
-            <p>2. Set a clear close time so teammates know the deadline.</p>
-            <p>3. Seed common items if the group already aligned on staples.</p>
+          <div className="mt-4 space-y-4 text-sm leading-7 text-slate-300 stagger-enter">
+            <div className="flex items-start gap-3 rounded-2xl border border-white/6 bg-white/4 p-3 transition-all duration-200 hover:bg-white/7">
+              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-cyan-300/15 text-xs font-bold text-cyan-200">1</span>
+              <p>Choose the restaurant and delivery zone.</p>
+            </div>
+            <div className="flex items-start gap-3 rounded-2xl border border-white/6 bg-white/4 p-3 transition-all duration-200 hover:bg-white/7">
+              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-cyan-300/15 text-xs font-bold text-cyan-200">2</span>
+              <p>Set a clear close time so teammates know the deadline.</p>
+            </div>
+            <div className="flex items-start gap-3 rounded-2xl border border-white/6 bg-white/4 p-3 transition-all duration-200 hover:bg-white/7">
+              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-cyan-300/15 text-xs font-bold text-cyan-200">3</span>
+              <p>Seed common items if the group already aligned on staples.</p>
+            </div>
           </div>
         </div>
 
@@ -268,6 +286,15 @@ export default function CreateBatchPage() {
             JWT. Demo sign-in automatically routes create and add-item flows
             into local storage so the interface remains interactive.
           </p>
+          <div className="mt-4 flex items-center gap-2 text-sm">
+            <span className="relative flex h-2 w-2">
+              <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${session?.provider === 'demo' ? 'bg-amber-300' : 'bg-cyan-300'}`} />
+              <span className={`relative inline-flex h-2 w-2 rounded-full ${session?.provider === 'demo' ? 'bg-amber-400' : 'bg-cyan-400'}`} />
+            </span>
+            <span className={session?.provider === 'demo' ? 'text-amber-200' : 'text-cyan-200'}>
+              {session?.provider === "demo" ? "Running in local mode" : "Live MongoDB connection"}
+            </span>
+          </div>
         </div>
       </aside>
     </div>

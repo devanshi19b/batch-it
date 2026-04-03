@@ -96,7 +96,7 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen px-4 py-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen px-4 py-4 sm:px-6 lg:px-8 page-enter">
       <div className="mx-auto grid min-h-[calc(100vh-2rem)] max-w-7xl gap-6 lg:grid-cols-[1.08fr_0.92fr]">
         <BrandPanel />
 
@@ -104,14 +104,14 @@ export default function AuthPage() {
           <div className="ambient-orb right-[-6rem] top-[-4rem] h-40 w-40 bg-cyan-400/16" />
           <div className="ambient-orb bottom-[-3rem] left-[-3rem] h-36 w-36 bg-amber-300/12 [animation-delay:1.2s]" />
 
-          <div className="relative z-10 w-full max-w-md">
+          <div className="relative z-10 w-full max-w-md stagger-enter">
             <div className="mb-8 flex items-center gap-2 rounded-full border border-white/10 bg-white/6 p-1">
               {[
                 ["login", "Sign in", KeyRound],
                 ["register", "Create account", UserPlus],
               ].map(([value, label, Icon]) => (
                 <button
-                  className={`flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-medium transition ${
+                  className={`flex flex-1 items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-medium transition-all duration-300 ${
                     mode === value
                       ? "bg-white text-slate-950 shadow-lg"
                       : "text-slate-400 hover:text-slate-100"
@@ -133,10 +133,15 @@ export default function AuthPage() {
               <p className="text-sm uppercase tracking-[0.26em] text-cyan-100">
                 Batch-It access
               </p>
-              <h2 className="text-4xl font-semibold tracking-tight text-white">
-                {mode === "login"
-                  ? "Step back into your ordering board."
-                  : "Create a workspace in minutes."}
+              <h2 className="text-4xl font-semibold tracking-tight">
+                <span className="text-gradient">
+                  {mode === "login"
+                    ? "Step back into your"
+                    : "Create a workspace"}
+                </span>{" "}
+                <span className="text-white">
+                  {mode === "login" ? "ordering board." : "in minutes."}
+                </span>
               </h2>
               <p className="text-sm leading-7 text-slate-400">
                 Primary auth uses your backend first, then falls back to a
@@ -189,13 +194,20 @@ export default function AuthPage() {
               </div>
 
               {error ? (
-                <div className="rounded-[20px] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-100">
+                <div className="rounded-[20px] border border-rose-300/20 bg-rose-300/10 px-4 py-3 text-sm text-rose-100 animate-[fadeSlideUp_0.3s_ease]">
                   {error}
                 </div>
               ) : null}
 
               <button className="button-primary w-full" disabled={loading} type="submit">
-                <ArrowRight size={18} />
+                {loading ? (
+                  <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                  </svg>
+                ) : (
+                  <ArrowRight size={18} />
+                )}
                 {loading
                   ? "Processing..."
                   : mode === "login"
@@ -204,7 +216,7 @@ export default function AuthPage() {
               </button>
             </form>
 
-            <div className="mt-6 rounded-[24px] border border-white/10 bg-white/5 p-4">
+            <div className="mt-6 rounded-[24px] border border-white/10 bg-white/5 p-4 transition-all duration-300 hover:border-cyan-300/16 hover:bg-white/7">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <p className="text-sm font-semibold text-white">

@@ -180,7 +180,7 @@ export default function BatchDetailPage() {
 
   if (loading) {
     return (
-      <div className="dashboard-grid">
+      <div className="dashboard-grid stagger-enter">
         <PanelSkeleton lines={4} />
         <PanelSkeleton lines={6} />
         <PanelSkeleton lines={5} />
@@ -208,7 +208,7 @@ export default function BatchDetailPage() {
   const isBatchOwner = getEntityId(batch.initiator) === getEntityId(user?.id);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 stagger-enter">
       <section className="glass-panel-strong overflow-hidden rounded-[32px] px-6 py-6 sm:px-8">
         <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
           <div>
@@ -220,8 +220,8 @@ export default function BatchDetailPage() {
               <StatusBadge status={batch.status} />
             </div>
 
-            <h1 className="mt-4 text-4xl font-semibold tracking-tight text-white">
-              {batch.restaurantName}
+            <h1 className="mt-4 text-4xl font-semibold tracking-tight">
+              <span className="text-gradient">{batch.restaurantName}</span>
             </h1>
             <p className="mt-2 text-base text-slate-400">
               Delivering to {batch.buildingId} • closes at{" "}
@@ -231,7 +231,7 @@ export default function BatchDetailPage() {
 
           <div className="flex flex-col gap-3 sm:flex-row">
             <div
-              className={`inline-flex items-center gap-3 rounded-[24px] border px-4 py-3 text-sm ${
+              className={`inline-flex items-center gap-3 rounded-[24px] border px-4 py-3 text-sm transition-colors duration-300 ${
                 time.isExpired
                   ? "border-rose-300/20 bg-rose-300/10 text-rose-100"
                   : "border-cyan-300/20 bg-cyan-300/10 text-cyan-100"
@@ -247,7 +247,14 @@ export default function BatchDetailPage() {
               disabled={!isBatchOwner || batch.status === "CLOSED" || actionLoading}
               type="button"
             >
-              <CircleSlash2 size={16} />
+              {actionLoading ? (
+                <svg className="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              ) : (
+                <CircleSlash2 size={16} />
+              )}
               {batch.status === "CLOSED"
                 ? "Batch closed"
                 : isBatchOwner
@@ -259,13 +266,14 @@ export default function BatchDetailPage() {
       </section>
 
       {source === "demo" ? (
-        <div className="rounded-[24px] border border-amber-300/20 bg-amber-300/10 px-5 py-4 text-sm text-amber-50">
+        <div className="rounded-[24px] border border-amber-300/20 bg-amber-300/10 px-5 py-4 text-sm text-amber-50 animate-[fadeSlideUp_0.4s_ease]">
+          <span className="mr-2 inline-flex h-2 w-2 rounded-full bg-amber-400" />
           Demo mode is driving this batch. Real-time Socket.IO sync is available
           when the backend is connected with a backend-issued JWT.
         </div>
       ) : null}
 
-      <div className="dashboard-grid">
+      <div className="dashboard-grid stagger-enter">
         <div className="xl:sticky xl:top-6 xl:self-start">
           <UserListPanel batch={batch} currentUserId={user?.id} />
         </div>

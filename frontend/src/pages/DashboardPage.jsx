@@ -116,7 +116,7 @@ export default function DashboardPage() {
   }, [refreshing, pushToast]);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 stagger-enter">
       <section className="glass-panel-strong relative overflow-hidden rounded-[32px] px-6 py-8 sm:px-8">
         <div className="ambient-orb right-[-2rem] top-[-3rem] h-40 w-40 bg-cyan-300/16" />
 
@@ -126,8 +126,9 @@ export default function DashboardPage() {
               <Sparkles size={14} />
               Batch intelligence
             </span>
-            <h1 className="mt-5 max-w-2xl text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-              Shared ordering that looks and feels under control.
+            <h1 className="mt-5 max-w-2xl text-4xl font-semibold tracking-tight sm:text-5xl">
+              <span className="text-gradient">Shared ordering</span>{" "}
+              <span className="text-white">that looks and feels under control.</span>
             </h1>
             <p className="mt-4 max-w-xl text-base leading-7 text-slate-400">
               Track every live batch, jump into detail instantly, and keep team
@@ -156,7 +157,7 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-3">
+      <section className="grid gap-4 lg:grid-cols-3 stagger-enter">
         {[
           {
             icon: Boxes,
@@ -174,11 +175,11 @@ export default function DashboardPage() {
             value: summary.totalItems,
           },
         ].map(({ icon: Icon, label, value }) => (
-          <div className="glass-panel rounded-[28px] p-6" key={label}>
+          <div className="glass-panel card-hover-glow rounded-[28px] p-6 transition-all duration-300 hover:border-cyan-300/20" key={label}>
             <div className="mb-4 inline-flex rounded-2xl border border-cyan-300/18 bg-cyan-300/10 p-3 text-cyan-100">
               <Icon size={18} />
             </div>
-            <p className="text-3xl font-semibold tracking-tight text-white">
+            <p className="text-3xl font-semibold tracking-tight text-white stat-value">
               {value}
             </p>
             <p className="mt-2 text-sm text-slate-400">{label}</p>
@@ -187,7 +188,8 @@ export default function DashboardPage() {
       </section>
 
       {source === "demo" ? (
-        <div className="rounded-[24px] border border-amber-300/20 bg-amber-300/10 px-5 py-4 text-sm text-amber-50">
+        <div className="rounded-[24px] border border-amber-300/20 bg-amber-300/10 px-5 py-4 text-sm text-amber-50 animate-[fadeSlideUp_0.4s_ease]">
+          <span className="mr-2 inline-flex h-2 w-2 rounded-full bg-amber-400" />
           Demo mode is active. Batch data is being served from local fallback
           storage so the UI stays usable even if the backend is offline.
         </div>
@@ -206,7 +208,7 @@ export default function DashboardPage() {
         />
       ) : null}
 
-      <section className="grid gap-5 xl:grid-cols-2">
+      <section className="grid gap-5 xl:grid-cols-2 stagger-enter">
         {loading
           ? Array.from({ length: 4 }).map((_, index) => (
               <BatchCardSkeleton key={index} />

@@ -7,8 +7,15 @@ export const API_BASE_URL =
 
 export const API_ORIGIN = (() => {
   try {
-    return new URL(API_BASE_URL).origin;
+    const url = new URL(API_BASE_URL);
+    return url.origin;
   } catch {
+    // Relative path (e.g. "/api") — use the current browser origin
+    // so the Vite dev proxy handles the request
+    if (typeof window !== "undefined") {
+      return window.location.origin;
+    }
+
     return "http://localhost:5050";
   }
 })();

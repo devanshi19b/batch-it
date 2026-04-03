@@ -10,7 +10,7 @@ export default function BatchCard({ batch }) {
 
   return (
     <Link
-      className="glass-panel group block rounded-[30px] p-6 transition duration-300 hover:-translate-y-1 hover:border-cyan-300/24 hover:bg-slate-900/75"
+      className="glass-panel card-hover-glow group block rounded-[30px] p-6 transition-all duration-300 hover:-translate-y-1 hover:border-cyan-300/24 hover:bg-slate-900/75 hover:shadow-[0_30px_60px_rgba(3,8,18,0.6)]"
       to={`/batches/${batch._id}`}
     >
       <div className="flex items-start justify-between gap-4">
@@ -26,7 +26,7 @@ export default function BatchCard({ batch }) {
       </div>
 
       <div className="mt-5 flex items-center gap-2 text-sm text-slate-400">
-        <Clock3 size={16} className={time.isExpired ? "text-rose-300" : ""} />
+        <Clock3 size={16} className={`transition-colors duration-300 ${time.isExpired ? "text-rose-300" : ""}`} />
         <span>{time.label}</span>
         <span className="text-slate-600">•</span>
         <span>{formatDateTime(batch.expiresAt)}</span>
@@ -51,7 +51,7 @@ export default function BatchCard({ batch }) {
           },
         ].map(({ icon: Icon, label, value }) => (
           <div
-            className="rounded-[24px] border border-white/8 bg-white/6 p-4"
+            className="rounded-[24px] border border-white/8 bg-white/6 p-4 transition-all duration-300 group-hover:bg-white/8"
             key={label}
           >
             <div className="mb-3 inline-flex rounded-2xl border border-white/10 bg-slate-900/65 p-2 text-cyan-100">
@@ -69,10 +69,10 @@ export default function BatchCard({ batch }) {
         <span className="text-slate-400">
           Created by {batch.initiator?.name || "Batch owner"}
         </span>
-        <span className="inline-flex items-center gap-2 font-medium text-cyan-100">
+        <span className="inline-flex items-center gap-2 font-medium text-cyan-100 transition-all duration-300 group-hover:gap-3">
           Open workspace
           <ArrowRight
-            className="transition duration-300 group-hover:translate-x-1"
+            className="transition-transform duration-300 group-hover:translate-x-1"
             size={16}
           />
         </span>
